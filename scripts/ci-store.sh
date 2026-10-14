@@ -30,7 +30,7 @@ VERSION="${TAG#v}"
 
 # FILES.LST: "crc32 size path" per line, the CRC from the gzip trailer.
 files_list() {
-  (cd "$1" && find . -type f ! -name FILES.LST | sed 's|^\./||' | sort |
+  (cd "$1" && find . -type f ! -name FILES.LST ! -name FILES.LST.new | sed 's|^\./||' | sort |
     while IFS= read -r f; do
       crc=$(gzip -c "$f" | tail -c 8 | od -An -tx4 -N4 | tr -d ' \n')
       size=$(wc -c < "$f" | tr -d ' ')
