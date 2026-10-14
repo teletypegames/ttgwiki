@@ -1,0 +1,12 @@
+export/*
+!export/README.md
+.env
+SOURCE/build/
+.DS_Store
+dist/
+__pycache__/
+# Written when this checkout is also the installed TTGWIKI (C:\TTGWIKI in DOSBox)
+/INFO.INI
+/INSTALL.LST
+/CACHE/
+*.err
