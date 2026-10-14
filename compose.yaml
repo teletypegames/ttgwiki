@@ -1,0 +1,61 @@
+# The server side of TTGWIKI: the exporter turns the public pages of the wiki into text
+# files in ./export, the FTP server shares them, anonymous, read-only and passive only.
+#
+# The exporter reads Grav inside the wiki's own network (wiki-pages_default, the
+# services/wiki-pages stack), so the wiki stack has to run first. It exports at start
+# and then every INTERVAL seconds; a restart exports again.
+#
+# FTP_MASQUERADE is the public IP announced in PASV replies (TTGWIKI itself ignores it,
+# other FTP clients need it); set it in .env.
+name: ttgwiki
+
+services:
+  exporter:
+    build: server
+    image: ttgwiki-server:latest
+    command: ["python", "/app/export.py"]
+    restart: unless-stopped
+    user: "${EXPORT_UID:-1000}:${EXPORT_GID:-1000}"
+    environment:
+      WIKI_URL: ${WIKI_URL:-http://grav}
+      PUBLIC_URL: https://wiki.teletypegames.org
+      LANGUAGES: en,hu
+      INTERVAL: ${INTERVAL:-900}
+    volumes:
+      - ./export:/export
+    networks:
+      - wiki
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 256m
+    pids_limit: 32
+
+  ftp:
+    build: server
+    image: ttgwiki-server:latest
+    depends_on:
+      - exporter
+    restart: unless-stopped
+    ports:
+      - "2121:2121"
+      - "30010-30019:30010-30019"
+    environment:
+      FTP_PASSIVE: 30010-30019
+      FTP_MASQUERADE: ${FTP_MASQUERADE:-}
+    volumes:
+      - ./export:/export:ro
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 128m
+    pids_limit: 64
+
+networks:
+  wiki:
+    name: wiki-pages_default
+    external: true

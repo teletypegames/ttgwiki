@@ -1,0 +1,76 @@
+# First the fast checks (scripts/ci-check.sh): the code style, the layers, the unit tests
+# of the client on the host (SOURCE/test/unit) and the tests of the server side
+# (server/test). Then it builds TTGWIKI.EXE (DOS) and TTGWIKIW.EXE (Win32) with Open
+# Watcom and runs the end-to-end tests: the exporter writes a small export from a fake
+# wiki, the FTP server shares it, SOURCE/test/run.sh runs TTGWIKI in a headless DOSBox
+# Staging (NE2000 + mTCP), SOURCE/test/runw32.sh runs TTGWIKIW under Wine.
+# scripts/ci-toolchain.sh installs the pinned Open Watcom, DOSBox Staging and clang-format,
+# and Wine.
+#
+# A push to master that changes the server side (compose.yaml, server/) deploys it after
+# the tests (scripts/ci-deploy.sh): the exporter and the FTP server run in
+# /srv/stacks/ttgwiki on the server.
+#
+# A tag (vX.Y.Z, the same as Version in SOURCE/app/version.h) publishes a Gitea release:
+# TTGWIKI-<tag>.zip and TTGWIKIW-<tag>.zip with the folders to install, and the two
+# executables alone. It also puts both builds into the DOSINST program store
+# (ftp://ftp.teletypegames.org, /srv/stacks/dosinst/programs on the server).
+#
+# The deploy and the store steps mount folders of the server (and the deploy the docker
+# socket): the repository has to be trusted for volumes in Woodpecker (Repo settings ->
+# Trusted).
+when:
+  - event: [push, manual]
+    branch: master
+  - event: pull_request
+  - event: tag
+
+steps:
+  - name: test
+    image: debian:bookworm-slim
+    commands:
+      - scripts/ci-toolchain.sh
+      - scripts/ci-check.sh
+      - scripts/ci-build.sh
+      - scripts/ci-test.sh
+
+  # Only on master, and only after the tests passed.
+  - name: deploy
+    image: docker:cli
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /srv/stacks/ttgwiki:/srv/stacks/ttgwiki
+    commands:
+      - scripts/ci-deploy.sh
+    when:
+      - event: [push, manual]
+        branch: master
+        path:
+          include: [compose.yaml, "server/**", scripts/ci-deploy.sh]
+
+  # Only on a tag, and only after the tests passed: the release gets the program the
+  # test step built and tested.
+  - name: release
+    image: alpine
+    environment:
+      # A build started by the tag webhook may not get Woodpecker's forge credential, so
+      # the token is a repository secret; the script falls back to the forge credential
+      # when it is there.
+      GITEA_TOKEN:
+        from_secret: gitea_token
+    commands:
+      - apk add --no-cache curl jq zip
+      - scripts/ci-package.sh
+      - scripts/ci-upload.sh
+    when:
+      - event: tag
+
+  # Only on a tag, after the release: DOSINST installs and updates TTGWIKI from the store.
+  - name: store
+    image: alpine
+    volumes:
+      - /srv/stacks/dosinst/programs:/store
+    commands:
+      - scripts/ci-store.sh
+    when:
+      - event: tag
