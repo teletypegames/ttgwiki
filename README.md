@@ -17,9 +17,7 @@ TTGWIKI reads the public pages of the [Teletype Games wiki](https://wiki.teletyp
 
 Only the public pages are exported: a page that is login-protected on the wiki (or sits under one) never leaves the server.
 
-![TTGWIKI contents](screenshot.png)
-
-![TTGWIKI reader](screenshot-reader.png)
+![TTGWIKI reading a page in DOSBox](screenshot.png)
 
 ## Files
 
