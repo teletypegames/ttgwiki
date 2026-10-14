@@ -1,6 +1,7 @@
 #!/bin/sh
 # End-to-end test: the exporter writes a small export from a fake wiki
-# (server/test/fixture.py), the FTP server of the server side shares it on the host, and
+# (server/test/fixture.py), the test FTP server
+# (SOURCE/test/ftpserver.py) shares it on the host as WIKI, and
 # TTGWIKI runs in a headless DOSBox Staging (NE2000 + mTCP): it prints pages, downloads
 # them all, follows a new export, reads offline, and browses with scripted keys.
 #
@@ -21,6 +22,9 @@ WORK=$(mktemp -d)
 SERVER=
 trap 'stop_server; rm -rf "$WORK"' EXIT
 
+# The export is in WIKI, as on the live server; TTGWIKI.CFG has no PATH, so the default.
+mkdir -p "$WORK/ftp/WIKI"
+ln -s ftp/WIKI "$WORK/export"
 "$PYTHON" ../../server/test/fixture.py "$WORK/export" 1 > /dev/null
 mkdir -p "$WORK/c/TTGWIKI" "$WORK/c/MTCP"
 cp ../../TTGWIKI.EXE "$WORK/c/TTGWIKI/"
@@ -30,7 +34,7 @@ printf 'PACKETINT 0x60\r\n' > "$WORK/c/MTCP/MTCP.CFG"
 printf 'SERVER=10.0.2.2\r\nPORT=%s\r\nLANG=EN\r\nCODEPAGE=437\r\n' "$PORT" > "$WORK/c/TTGWIKI/TTGWIKI.CFG"
 
 start_server() {
-  FTP_ROOT="$WORK/export" FTP_PORT=$PORT FTP_PASSIVE=60200-60299 "$PYTHON" ../../server/ftpserver.py \
+  FTP_ROOT="$WORK/ftp" FTP_PORT=$PORT FTP_PASSIVE=60200-60299 "$PYTHON" ftpserver.py \
     > "$WORK/ftp.log" 2>&1 &
   SERVER=$!
   sleep 1

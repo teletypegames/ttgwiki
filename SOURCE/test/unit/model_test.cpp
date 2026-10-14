@@ -13,10 +13,11 @@
 TEST( configReadsTheSettings ) {
   Config config;
   CHECK_STR( config.server, "ftp.teletypegames.org" );
-  CHECK_INT( config.port, 2121 );
-  CHECK( config.read( "SERVER=10.0.2.2\r\nPORT=21\r\nLANG=hu\r\nCODEPAGE=852\r\nCACHE=D:\\WIKI\\\r\n" ) );
-  CHECK_STR( config.server, "10.0.2.2" );
   CHECK_INT( config.port, 21 );
+  CHECK_STR( config.root, "/WIKI" );
+  CHECK( config.read( "SERVER=10.0.2.2\r\nPORT=2121\r\nLANG=hu\r\nCODEPAGE=852\r\nCACHE=D:\\WIKI\\\r\n" ) );
+  CHECK_STR( config.server, "10.0.2.2" );
+  CHECK_INT( config.port, 2121 );
   CHECK_STR( config.lang, "HU" );
   CHECK( config.codePage == CodePage852 );
   CHECK_STR( config.cache, "D:\\WIKI" );

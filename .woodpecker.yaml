@@ -2,19 +2,19 @@
 # of the client on the host (SOURCE/test/unit) and the tests of the server side
 # (server/test). Then it builds TTGWIKI.EXE (DOS) and TTGWIKIW.EXE (Win32) with Open
 # Watcom and runs the end-to-end tests: the exporter writes a small export from a fake
-# wiki, the FTP server shares it, SOURCE/test/run.sh runs TTGWIKI in a headless DOSBox
+# wiki, the test FTP server shares it, SOURCE/test/run.sh runs TTGWIKI in a headless DOSBox
 # Staging (NE2000 + mTCP), SOURCE/test/runw32.sh runs TTGWIKIW under Wine.
 # scripts/ci-toolchain.sh installs the pinned Open Watcom, DOSBox Staging and clang-format,
 # and Wine.
 #
 # A push to master that changes the server side (compose.yaml, server/) deploys it after
-# the tests (scripts/ci-deploy.sh): the exporter and the FTP server run in
-# /srv/stacks/ttgwiki on the server.
+# the tests (scripts/ci-deploy.sh): the exporter runs in /srv/stacks/ttgwiki on the
+# server and writes the WIKI folder of the FTP server (infra/ftp-server).
 #
 # A tag (vX.Y.Z, the same as Version in SOURCE/app/version.h) publishes a Gitea release:
 # TTGWIKI-<tag>.zip and TTGWIKIW-<tag>.zip with the folders to install, and the two
 # executables alone. It also puts both builds into the DOSINST program store
-# (ftp://ftp.teletypegames.org, /srv/stacks/dosinst/programs on the server).
+# (ftp://ftp.teletypegames.org/APPS, /srv/stacks/ftp-server/root/APPS on the server).
 #
 # The deploy and the store steps mount folders of the server (and the deploy the docker
 # socket): the repository has to be trusted for volumes in Woodpecker (Repo settings ->
@@ -69,7 +69,7 @@ steps:
   - name: store
     image: alpine
     volumes:
-      - /srv/stacks/dosinst/programs:/store
+      - /srv/stacks/ftp-server/root/APPS:/store
     commands:
       - scripts/ci-store.sh
     when:

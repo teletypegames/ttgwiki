@@ -1,6 +1,6 @@
 #!/bin/sh
-# Run the end-to-end tests: the exporter writes a small export, the FTP server of the
-# server side shares it, TTGWIKI.EXE runs in a headless DOSBox Staging
+# Run the end-to-end tests: the exporter writes a small export, the test FTP
+# server shares it, TTGWIKI.EXE runs in a headless DOSBox Staging
 # (SOURCE/test/run.sh) and TTGWIKIW.EXE under Wine (SOURCE/test/runw32.sh).
 set -eu
 DOSBOX="${DOSBOX:-/opt/dosbox-staging/dosbox}" WATCOM="${WATCOM:-/opt/watcom}" PYTHON=python3 \

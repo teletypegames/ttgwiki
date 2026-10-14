@@ -1,5 +1,4 @@
-export/*
-!export/README.md
+export/
 .env
 SOURCE/build/
 .DS_Store

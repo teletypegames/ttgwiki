@@ -5,11 +5,11 @@
 #include "../lib/core/ini.h"
 #include "../lib/core/str.h"
 
-Config::Config() : port( 2121 ), codePage( CodePage437 ) {
+Config::Config() : port( 21 ), codePage( CodePage437 ) {
   strcpy( server, "ftp.teletypegames.org" );
   strcpy( user, "anonymous" );
   strcpy( password, "ttgwiki@" );
-  strcpy( root, "/" );
+  strcpy( root, "/WIKI" );
   strcpy( lang, "EN" );
   cache[0] = 0;
 }

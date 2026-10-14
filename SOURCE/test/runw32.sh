@@ -1,7 +1,7 @@
 #!/bin/sh
 # End-to-end test of the Win32 build (TTGWIKIW.EXE) under Wine: the exporter writes a
-# small export from a fake wiki (server/test/fixture.py), the FTP server of the server
-# side shares it on the host, and TTGWIKIW prints pages, downloads them all, follows a
+# small export from a fake wiki (server/test/fixture.py), the test FTP server
+# (SOURCE/test/ftpserver.py) shares it on the host as WIKI, and TTGWIKIW prints pages, downloads them all, follows a
 # new export and reads offline, from the command line.
 #
 #   PYTHON   python with pyftpdlib (default: python3)
@@ -17,7 +17,7 @@ export WINEDEBUG=-all WINEPREFIX="${WINEPREFIX:-/tmp/ttgwiki-wine}"
 WORK=$(mktemp -d)
 SERVER=
 start_server() {
-  FTP_ROOT="$WORK/export" FTP_PORT=$PORT FTP_PASSIVE=60400-60499 "$PYTHON" ../../server/ftpserver.py \
+  FTP_ROOT="$WORK/ftp" FTP_PORT=$PORT FTP_PASSIVE=60400-60499 "$PYTHON" ftpserver.py \
     > "$WORK/ftp.log" 2>&1 &
   SERVER=$!
   sleep 1
@@ -29,6 +29,8 @@ stop_server() {
 }
 trap 'stop_server; rm -rf "$WORK"' EXIT
 
+mkdir -p "$WORK/ftp/WIKI"
+ln -s ftp/WIKI "$WORK/export"
 "$PYTHON" ../../server/test/fixture.py "$WORK/export" 1 > /dev/null
 mkdir -p "$WORK/bin"
 cp ../../TTGWIKIW.EXE "$WORK/bin/"

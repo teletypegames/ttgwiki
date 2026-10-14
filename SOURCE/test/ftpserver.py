@@ -1,9 +1,8 @@
-"""Read-only anonymous FTP server for TTGWIKI (needs pyftpdlib).
-
-Serves FTP_ROOT to anonymous users: list and download only, passive mode only.
+"""The FTP server of the end-to-end tests (needs pyftpdlib): anonymous, read-only, passive
+only, like the live one (infra/ftp-server), whose root has the export in WIKI.
 Settings come from the environment:
 
-    FTP_ROOT          the export folder                   (default: export)
+    FTP_ROOT          the folder to serve                 (default: .)
     FTP_HOST          address to listen on                 (default: 127.0.0.1)
     FTP_PORT          control port                         (default: 2121)
     FTP_PASSIVE       passive port range, "first-last"     (default: 30010-30019)
@@ -19,7 +18,7 @@ from pyftpdlib.servers import FTPServer
 
 
 class PassiveOnlyHandler(FTPHandler):
-    banner = "TTGWIKI wiki export ready."
+    banner = "TTGWIKI test server ready."
 
     def ftp_PORT(self, line):
         self.respond("502 Active mode is disabled, use PASV.")
@@ -29,7 +28,7 @@ class PassiveOnlyHandler(FTPHandler):
 
 
 def main():
-    root = os.environ.get("FTP_ROOT", "export")
+    root = os.environ.get("FTP_ROOT", ".")
     first, last = (int(p) for p in os.environ.get("FTP_PASSIVE", "30010-30019").split("-"))
 
     authorizer = DummyAuthorizer()

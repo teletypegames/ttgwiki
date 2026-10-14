@@ -1,6 +1,6 @@
 # TTGWIKI – the Teletype Games wiki on DOS
 
-TTGWIKI reads the public pages of the [Teletype Games wiki](https://wiki.teletypegames.org) on DOS (`TTGWIKI.EXE`, mTCP over a packet driver) and on Windows 95 and later (`TTGWIKIW.EXE`, Winsock, in a console window). A DOS machine cannot speak HTTPS, so the server side of this repository exports the wiki as plain text files and shares them over anonymous, read-only FTP, the way [DOSINST](https://git.teletypegames.org/dos/dosinst)'s store works. TTGWIKI downloads a page when it is read and keeps it, so a page read once can be read again offline; `F6` (or `TTGWIKI SYNC`) downloads every page.
+TTGWIKI reads the public pages of the [Teletype Games wiki](https://wiki.teletypegames.org) on DOS (`TTGWIKI.EXE`, mTCP over a packet driver) and on Windows 95 and later (`TTGWIKIW.EXE`, Winsock, in a console window). A DOS machine cannot speak HTTPS, so the server side of this repository exports the wiki as plain text files, and the Teletype Games FTP server ([infra/ftp-server](https://git.teletypegames.org/infra/ftp-server)) shares them over anonymous, read-only FTP, next to [DOSINST](https://git.teletypegames.org/dos/dosinst)'s store. TTGWIKI downloads a page when it is read and keeps it, so a page read once can be read again offline; `F6` (or `TTGWIKI SYNC`) downloads every page.
 
 ```
  wiki.teletypegames.org (Grav)
@@ -9,7 +9,7 @@ TTGWIKI reads the public pages of the [Teletype Games wiki](https://wiki.teletyp
  exporter (server/export.py)   at start, then every 15 minutes
         │  WIKI.INI, EN/INDEX.TXT, EN/FILES.LST, EN/P0000001.TXT, ... HU/...
         ▼
- FTP (server/ftpserver.py)     ftp://ftp.teletypegames.org:2121, anonymous, read-only
+ FTP (infra/ftp-server)        ftp://ftp.teletypegames.org/WIKI, anonymous, read-only
         │
         ▼
  TTGWIKI.EXE / TTGWIKIW.EXE    CACHE\EN\..., CACHE\HU\... next to the executable
@@ -28,8 +28,8 @@ Only the public pages are exported: a page that is login-protected on the wiki (
 | `TTGWIKI.CFG` | The settings (optional: without it the defaults below are used). |
 | `CACHE\` | *Made at runtime*, next to the executable: the downloaded pages, a folder per language. It can be deleted at any time. |
 | `SOURCE/` | The client's source (C++, Open Watcom), in layers (see [Structure](#structure)). |
-| `server/` | The server side: the exporter (`export.py`, `render.py`) and the FTP server (`ftpserver.py`), Python. |
-| `compose.yaml` | The server side's stack: the exporter and the FTP server. |
+| `server/` | The server side: the exporter (`export.py`, `render.py`), Python. |
+| `compose.yaml` | The server side's stack: the exporter. |
 
 ## Installation
 
@@ -79,9 +79,9 @@ At start, and on F5, TTGWIKI reads `WIKI.INI` from the server. When its generati
 | Key | Default | |
 |---|---|---|
 | `SERVER` | `ftp.teletypegames.org` | the FTP server of the export |
-| `PORT` | `2121` | |
+| `PORT` | `21` | |
 | `USER`, `PASSWORD` | `anonymous`, `ttgwiki@` | |
-| `PATH` | `/` | the folder of the export on the server |
+| `PATH` | `/WIKI` | the folder of the export on the server |
 | `LANG` | `EN` | the language at start: `EN` or `HU` |
 | `CODEPAGE` | `437` | the code page of the screen: `437` (US), or `852` (Central European, with every Hungarian letter). In 437 the letters it lacks become a near one (ő → ö, ű → ü). |
 | `CACHE` | `CACHE` next to the executable | where the pages are kept |
@@ -109,16 +109,13 @@ The files are UTF-8 with CRLF line ends; TTGWIKI turns them into the code page o
 
 ## The server
 
-`compose.yaml` runs two containers from one image (`server/Dockerfile`): the exporter, which writes `./export`, and the FTP server ([pyftpdlib](https://github.com/giampaolo/pyftpdlib), the one of DOSINST), which shares it: anonymous, read-only, passive mode only (`PORT`/`EPRT` get a 502), without root and with a read-only file system. The exporter joins the wiki's network (`wiki-pages_default`), so the `services/wiki-pages` stack has to run first.
+`compose.yaml` runs the exporter (`server/Dockerfile`), without root and with a read-only file system. It writes the export into the `WIKI` folder of the Teletype Games FTP server (`EXPORT_DIR`, by default `/srv/stacks/ftp-server/root/WIKI`), which shares it as `ftp://ftp.teletypegames.org/WIKI`: anonymous, read-only, passive mode only. The exporter joins the wiki's network (`wiki-pages_default`), so the `services/wiki-pages` stack has to run first.
 
 ```sh
-echo FTP_MASQUERADE=<public IP> > .env   # the address announced in PASV replies
 docker compose up -d --build
 ```
 
-Ports: `2121` (control) and `30010-30019` (passive data). TTGWIKI connects to the data port on the server's own address, so only other FTP clients need `FTP_MASQUERADE`.
-
-The live server is `ftp.teletypegames.org:2121` (the `ttgwiki` stack on vps.teletype.hu, `/srv/stacks/ttgwiki`). A push to master that changes the server side deploys it (`scripts/ci-deploy.sh`, the pipeline's `deploy` step).
+The live exporter is the `ttgwiki` stack on vps.teletype.hu (`/srv/stacks/ttgwiki`). A push to master that changes the server side deploys it (`scripts/ci-deploy.sh`, the pipeline's `deploy` step).
 
 ## Building
 
@@ -156,7 +153,7 @@ The rules of the code (C++98 for Open Watcom, interfaces, names, format) are in 
 
 - `python3 -m unittest discover -s server/test`: the renderer (wrapping, styles, links, lists, code, quotes, the three ways of a table) and the exporter on a fake wiki (the tree, the ids that stay, the private pages, a new generation only on a change, a failed run that changes nothing).
 - `SOURCE/test/unit/run.sh`: the client's unit tests on the host with its C++ compiler, on a fake server and an in-memory disk: the models, the page reader, the sync (a new generation, a bad checksum, an export that changed under a download, offline) and the browser with scripted keys. It checks the layers first.
-- `SOURCE/test/run.sh`: the exporter writes a small export from a fake wiki (`server/test/fixture.py`), `server/ftpserver.py` shares it on the host, and TTGWIKI.EXE runs in a headless DOSBox Staging: it prints pages, downloads them all, follows a new export, prints Hungarian in code page 852, reads offline, and browses with a test build (`build.sh test`) that takes its keys from `TESTKEYS` and saves the screen when they run out. `SOURCE/test/runw32.sh` does the same with TTGWIKIW.EXE under Wine, from the command line.
+- `SOURCE/test/run.sh`: the exporter writes a small export from a fake wiki (`server/test/fixture.py`), `SOURCE/test/ftpserver.py` shares it on the host as `WIKI`, and TTGWIKI.EXE runs in a headless DOSBox Staging: it prints pages, downloads them all, follows a new export, prints Hungarian in code page 852, reads offline, and browses with a test build (`build.sh test`) that takes its keys from `TESTKEYS` and saves the screen when they run out. `SOURCE/test/runw32.sh` does the same with TTGWIKIW.EXE under Wine, from the command line.
 
 ```sh
 PYTHON=/path/to/python-with-pyftpdlib SOURCE/test/run.sh

@@ -1,6 +1,7 @@
 #!/bin/sh
-# Publish the built programs to the DOSINST program store (ftp://ftp.teletypegames.org), so
-# DOSINST installs and updates TTGWIKI: the TTGWIKI folder (TTGWIKI.EXE, PLATFORM=DOS) and
+# Publish the built programs to the DOSINST program store
+# (ftp://ftp.teletypegames.org/APPS), so DOSINST installs and updates TTGWIKI: the
+# TTGWIKI folder (TTGWIKI.EXE, PLATFORM=DOS) and
 # the TTGWIKIW folder (TTGWIKIW.EXE, PLATFORM=WIN32), each with README.md, LICENSE, an
 # INFO.INI that has the version of the tag, and FILES.LST (DOSINST's server/mkfiles.sh
 # format) that DOSINST checks the downloads against. TTGWIKI.CFG is left out: TTGWIKI
@@ -11,7 +12,7 @@
 #   scripts/ci-store.sh              the tag from Woodpecker (CI_COMMIT_TAG)
 #   TAG=v1.2.3 STORE=/tmp/store scripts/ci-store.sh
 #
-# STORE is the store's programs folder; in the pipeline /srv/stacks/dosinst/programs of
+# STORE is the store's programs folder; in the pipeline /srv/stacks/ftp-server/root/APPS of
 # the server is mounted there. Each new folder is put together next to the old one and
 # swapped in with two renames, so a download never sees it half written. The files get
 # STORE_OWNER (the server's tasi user), so the store can be managed without sudo.
