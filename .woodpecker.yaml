@@ -8,17 +8,25 @@
 # and Wine.
 #
 # A push to master that changes the server side (compose.yaml, server/) deploys it after
-# the tests (scripts/ci-deploy.sh): the exporter runs in /srv/stacks/ttgwiki on the
-# server and writes the WIKI folder of the FTP server (infra/ftp-server).
+# the tests: the exporter runs in /srv/stacks/ttgwiki on the server and writes the WIKI
+# folder of the FTP server (infra/ftp-server).
 #
 # A tag (vX.Y.Z, the same as Version in SOURCE/app/version.h) publishes a Gitea release:
 # TTGWIKI-<tag>.zip and TTGWIKIW-<tag>.zip with the folders to install, and the two
 # executables alone. It also puts both builds into the DOSINST program store
 # (ftp://ftp.teletypegames.org/APPS, /srv/stacks/ftp-server/root/APPS on the server).
 #
-# The deploy and the store steps mount folders of the server (and the deploy the docker
-# socket): the repository has to be trusted for volumes in Woodpecker (Repo settings ->
-# Trusted).
+# Neither step touches the server's files: both call the server's deploy user over SSH,
+# each with its own key bound on the server to one fixed command (ci-deploy,
+# infra/host-config). deploy_ssh_key (push, manual) runs `ci-deploy ttgwiki`: the server
+# clones master from Gitea itself, checks compose.yaml against a policy (no privileged,
+# no extra capabilities or host namespaces, no docker socket, bind mounts only in the
+# stack and the FTP server's WIKI folder), copies compose.yaml and server/ into
+# /srv/stacks/ttgwiki and runs docker compose up -d --build (what scripts/ci-deploy.sh
+# did). store_ssh_key (tag) runs `ci-deploy dos-ttgwiki-store`: the step sends the
+# TTGWIKI and TTGWIKIW folders built by scripts/ci-store.sh as a tar, the server unpacks
+# them unprivileged, accepts only those two folders with regular files, and swaps them
+# into /srv/stacks/ftp-server/root/APPS. No trusted volumes are needed.
 when:
   - event: [push, manual]
     branch: master
@@ -36,12 +44,15 @@ steps:
 
   # Only on master, and only after the tests passed.
   - name: deploy
-    image: docker:cli
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-      - /srv/stacks/ttgwiki:/srv/stacks/ttgwiki
+    image: alpine/git:v2.54.0
+    environment:
+      DEPLOY_SSH_KEY:
+        from_secret: deploy_ssh_key
     commands:
-      - scripts/ci-deploy.sh
+      - mkdir -p -m 700 "$HOME/.ssh"
+      - printf '%s\n' "$DEPLOY_SSH_KEY" > "$HOME/.ssh/id_deploy" && chmod 600 "$HOME/.ssh/id_deploy"
+      - echo 'vps.teletype.hu ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPR9RYc98lPw4w6LYlaVAkZTlleO+kE4vyWxEk9x3EDd' > "$HOME/.ssh/known_hosts"
+      - ssh -i "$HOME/.ssh/id_deploy" -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=yes deploy@vps.teletype.hu
     when:
       - event: [push, manual]
         branch: master
@@ -67,10 +78,16 @@ steps:
 
   # Only on a tag, after the release: DOSINST installs and updates TTGWIKI from the store.
   - name: store
-    image: alpine
-    volumes:
-      - /srv/stacks/ftp-server/root/APPS:/store
+    image: alpine/git:v2.54.0
+    environment:
+      STORE_SSH_KEY:
+        from_secret: store_ssh_key
     commands:
-      - scripts/ci-store.sh
+      - rm -rf /tmp/store && mkdir /tmp/store
+      - STORE=/tmp/store scripts/ci-store.sh
+      - mkdir -p -m 700 "$HOME/.ssh"
+      - printf '%s\n' "$STORE_SSH_KEY" > "$HOME/.ssh/id_deploy" && chmod 600 "$HOME/.ssh/id_deploy"
+      - echo 'vps.teletype.hu ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPR9RYc98lPw4w6LYlaVAkZTlleO+kE4vyWxEk9x3EDd' > "$HOME/.ssh/known_hosts"
+      - tar -C /tmp/store -cf - . | ssh -i "$HOME/.ssh/id_deploy" -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=yes deploy@vps.teletype.hu
     when:
       - event: tag
