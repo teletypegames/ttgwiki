@@ -145,7 +145,7 @@ The code is in layers; each one uses only the ones below it, and only through th
 | `SOURCE/view` | The screens and the command line output. |
 | `SOURCE/platform` | `exeDir` and the network adapters (mTCP, Winsock). |
 | `SOURCE/app` | `runTtgwiki`: puts the layers together for a machine. |
-| `SOURCE/lib` | [doslib](https://git.teletypegames.org/dos/doslib) as a git subtree, shared with DOSINST, GMENU and BMAGIC: strings, INI, CRC-32, the code pages, the FTP client, the screen and the keyboard, the file system, the test helpers. |
+| `SOURCE/lib` | [DOSLIB](https://git.teletypegames.org/dos/doslib) as a git subtree, shared with DOSINST, GMENU and BMAGIC: strings, INI, CRC-32, the code pages, the FTP client, the screen and the keyboard, the file system, the test helpers. |
 
 The rules of the code (C++98 for Open Watcom, interfaces, names, format) are in `SOURCE/lib/README.md`.
 
