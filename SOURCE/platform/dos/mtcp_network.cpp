@@ -28,6 +28,20 @@ static TcpSocket *socketOf( void *s ) {
   return (TcpSocket *)s;
 }
 
+/* TcpSocket::connect waits out its whole timeout even when the server refused the connection
+   (an RST closes the socket); this one stops there, so an offline server is reported at once. */
+static bool waitConnected( TcpSocket *s, uint16_t local, IpAddr_t addr, uint16_t port ) {
+  if ( s->connectNonBlocking( local, addr, port ) ) return false;
+  clockTicks_t start = TIMER_GET_CURRENT();
+  while ( !Interrupted ) {
+    Utils::processPackets();
+    if ( s->isConnectComplete() ) return true;
+    if ( s->isClosed() ) return false;
+    if ( Timer_diff( start, TIMER_GET_CURRENT() ) > TIMER_MS_TO_TICKS( 10000ul ) ) return false;
+  }
+  return false;
+}
+
 MtcpNetwork::MtcpNetwork() : nextPort_( 0 ), up_( false ) {
   for ( int i = 0; i < MaxHandles; i++ ) sockets_[i] = NULL;
 }
@@ -76,7 +90,7 @@ int MtcpNetwork::connect( const unsigned char ip[4], unsigned port, unsigned rec
   }
   uint16_t local = nextPort_;
   nextPort_ = ( nextPort_ >= 30000 ) ? 2048 : nextPort_ + 1;
-  if ( s->connect( local, addr, port, 10000 ) ) {
+  if ( !waitConnected( s, local, addr, port ) ) {
     TcpSocketMgr::freeSocket( s );
     return -1;
   }

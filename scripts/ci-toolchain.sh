@@ -10,6 +10,10 @@
 # Open Watcom goes to /opt/watcom (only the Linux binaries, headers and the 16-bit and
 # 32-bit libraries),
 # DOSBox Staging to /opt/dosbox-staging.
+#
+# The pipeline's image (git.teletypegames.org/build/dos-ci:bookworm, built by
+# services/teletypegames ci/dos-bookworm.Dockerfile) has all of this preinstalled and lists
+# its versions in /opt/dos-ci/versions; when they are the ones pinned here, nothing is installed.
 set -eu
 
 CLANG_FORMAT_VERSION="${CLANG_FORMAT_VERSION:-18.1.8}"
@@ -18,6 +22,16 @@ OW_RELEASE="${OW_RELEASE:-2026-10-01-Build}"
 DOSBOX_VERSION="${DOSBOX_VERSION:-v0.83.0}"
 
 say() { echo "[ci-toolchain] $*"; }
+
+preinstalled() {
+  [ -r /opt/dos-ci/versions ] || return 1
+  for pin in "$@"; do grep -qx "$pin" /opt/dos-ci/versions || return 1; done
+}
+if preinstalled "OW_RELEASE=$OW_RELEASE" "DOSBOX_VERSION=$DOSBOX_VERSION" \
+  "CLANG_FORMAT_VERSION=$CLANG_FORMAT_VERSION"; then
+  say "preinstalled in the CI image: $(tr '\n' ' ' < /opt/dos-ci/versions)"
+  exit 0
+fi
 
 dpkg --add-architecture i386
 apt-get update
