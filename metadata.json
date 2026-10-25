@@ -1,0 +1,13 @@
+{
+  "name": "ttgwiki",
+  "title": "TTGWIKI",
+  "author": "Teletype Games",
+  "desc": "The Teletype Games wiki on DOS: browse, search and print its pages, or download them all to read offline. TTGWIKIW is the same program for Windows 95 and later.",
+  "license": "GPL-3.0",
+  "category": "tool",
+  "repo": "https://git.teletypegames.org/dos/ttgwiki",
+  "dos": {
+    "folder": "TTGWIKI",
+    "win32_folder": "TTGWIKIW"
+  }
+}
