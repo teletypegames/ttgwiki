@@ -115,7 +115,7 @@ The files are UTF-8 with CRLF line ends; TTGWIKI turns them into the code page o
 docker compose up -d --build
 ```
 
-The live exporter is the `ttgwiki` stack on vps.teletype.hu (`/srv/stacks/ttgwiki`). A push to master that changes the server side deploys it (`scripts/ci-deploy.sh`, the pipeline's `deploy` step).
+The live exporter is the `ttgwiki` stack on vps.teletype.hu (`/srv/stacks/ttgwiki`). A push to master that changes the server side deploys it (`.woodpecker/deploy.yaml`: the server's deploy user runs `ci-deploy ttgwiki`).
 
 ## Building
 
@@ -162,7 +162,7 @@ PYTHON=/path/to/python-with-pyftpdlib SOURCE/test/runw32.sh    # needs Wine
 
 ## Releases
 
-Woodpecker (`.woodpecker.yaml`) builds and tests every push: `scripts/ci-toolchain.sh` installs the pinned Open Watcom, DOSBox Staging and clang-format, and Wine, into a Debian image, `scripts/ci-check.sh` checks the code style and the layers and runs the unit tests of both sides, `scripts/ci-build.sh` builds both executables, `scripts/ci-test.sh` runs `SOURCE/test/run.sh` and `SOURCE/test/runw32.sh`. A push to master that changes the server side deploys it (`scripts/ci-deploy.sh`). A `vX.Y.Z` tag, which has to match `Version` in `SOURCE/app/version.h`, publishes a Gitea release with `RELEASE_NOTES.md` as its text, `TTGWIKI-vX.Y.Z.zip`, `TTGWIKIW-vX.Y.Z.zip` and the two executables, and puts both builds into DOSINST's store (`scripts/ci-store.sh`). The deploy and the store steps need the repository trusted for volumes; the upload uses the `gitea_token` repository secret, or Woodpecker's forge credential when there is one.
+Woodpecker (`.woodpecker/warp.yaml`, a `platform: dos` marker) runs the pipeline the WarpEngine of teletypegames.org serves, with the commands of the [dos-tools](https://git.teletypegames.org/build/dos-tools) builder image (Open Watcom, DOSBox Staging, Wine, clang-format): on every push `dos-check` (the code style, the layers, the unit tests of both sides), `dos-build` (`SOURCE/build.sh`) and `dos-test` (`SOURCE/test/run.sh` and `SOURCE/test/runw32.sh`). A push to master that changes the server side deploys it (`.woodpecker/deploy.yaml`). A `vX.Y.Z` tag, which has to match `Version` in `SOURCE/app/version.h`, publishes a Gitea release with `RELEASE_NOTES.md` as its text, `TTGWIKI-vX.Y.Z.zip`, `TTGWIKIW-vX.Y.Z.zip` and the two executables, publishes the release to the WarpEngine catalog, and puts both builds into DOSINST's store (without `TTGWIKI.CFG`). What a release holds is the `dos` block of `metadata.json`.
 
 ```sh
 git tag v0.1.0

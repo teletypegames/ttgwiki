@@ -8,6 +8,25 @@
   "repo": "https://git.teletypegames.org/dos/ttgwiki",
   "dos": {
     "folder": "TTGWIKI",
-    "win32_folder": "TTGWIKIW"
+    "files": [
+      "TTGWIKI.EXE",
+      "TTGWIKI.CFG",
+      "README.md",
+      "LICENSE"
+    ],
+    "settings": [
+      "TTGWIKI.CFG"
+    ],
+    "store_name": "TTGWIKI",
+    "store_description": "The Teletype Games wiki on DOS: browse, search and print its pages, or download them all to read offline. Needs mTCP (a packet driver and MTCPCFG).",
+    "win32_folder": "TTGWIKIW",
+    "win32_files": [
+      "TTGWIKIW.EXE",
+      "TTGWIKI.CFG",
+      "README.md",
+      "LICENSE"
+    ],
+    "win32_store_name": "TTGWIKI for Windows",
+    "win32_store_description": "TTGWIKI for Windows 95 and later: the Teletype Games wiki in a console window, with Winsock."
   }
 }
