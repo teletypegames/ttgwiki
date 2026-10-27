@@ -1,5 +1,6 @@
 {
   "name": "ttgwiki",
+  "version": "0.2.0",
   "title": "TTGWIKI",
   "author": "Teletype Games",
   "desc": "The Teletype Games wiki on DOS: browse, search and print its pages, or download them all to read offline. TTGWIKIW is the same program for Windows 95 and later.",
