@@ -1,6 +1,6 @@
 # The exporter of the wiki: it writes the export that the Teletype Games FTP server
 # (infra/ftp-server) shares as WIKI.
-FROM python:3.13.7-alpine3.22
+FROM python:3.13.18-alpine3.24
 
 COPY export.py render.py /app/
 
