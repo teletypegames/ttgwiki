@@ -6,7 +6,7 @@ the export the FTP server shares:
 
     WIKI.INI          format, generation, when, languages, line width
     EN/INDEX.TXT      the page tree, one page per line
-    EN/FILES.LST      "crc32 size path" of INDEX.TXT and the pages (as DOSINST's)
+    EN/FILES.LST      "crc32 size path" of INDEX.TXT and the pages (as WEDOS's)
     EN/P0000001.TXT   a page
     HU/...
 

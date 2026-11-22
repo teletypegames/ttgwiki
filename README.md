@@ -1,6 +1,6 @@
 # TTGWIKI – the Teletype Games wiki on DOS
 
-TTGWIKI reads the public pages of the [Teletype Games wiki](https://wiki.teletypegames.org) on DOS (`TTGWIKI.EXE`, mTCP over a packet driver) and on Windows 95 and later (`TTGWIKIW.EXE`, Winsock, in a console window). A DOS machine cannot speak HTTPS, so the server side of this repository exports the wiki as plain text files, and the Teletype Games FTP server ([infra/ftp-server](https://git.teletypegames.org/infra/ftp-server)) shares them over anonymous, read-only FTP, next to [DOSINST](https://git.teletypegames.org/dos/dosinst)'s store. TTGWIKI downloads a page when it is read and keeps it, so a page read once can be read again offline; `F6` (or `TTGWIKI SYNC`) downloads every page.
+TTGWIKI reads the public pages of the [Teletype Games wiki](https://wiki.teletypegames.org) on DOS (`TTGWIKI.EXE`, mTCP over a packet driver) and on Windows 95 and later (`TTGWIKIW.EXE`, Winsock, in a console window). A DOS machine cannot speak HTTPS, so the server side of this repository exports the wiki as plain text files, and the Teletype Games FTP server ([infra/ftp-server](https://git.teletypegames.org/infra/ftp-server)) shares them over anonymous, read-only FTP, next to [WEDOS](https://git.teletypegames.org/dos/we-dos)'s store. TTGWIKI downloads a page when it is read and keeps it, so a page read once can be read again offline; `F6` (or `TTGWIKI SYNC`) downloads every page.
 
 ```
  wiki.teletypegames.org (Grav)
@@ -33,10 +33,10 @@ Only the public pages are exported: a page that is login-protected on the wiki (
 
 ## Installation
 
-- **With DOSINST**: install `TTGWIKI` (DOS) or `TTGWIKIW` (Windows) from the [DOSINST](https://git.teletypegames.org/dos/dosinst) program store. An update keeps `TTGWIKI.CFG` and the downloaded pages (DOSINST keeps the files it did not install).
+- **With WEDOS**: install `TTGWIKI` (DOS) or `TTGWIKIW` (Windows) from the [WEDOS](https://git.teletypegames.org/dos/we-dos) program store. An update keeps `TTGWIKI.CFG` and the downloaded pages (WEDOS keeps the files it did not install).
 - **By hand**: unzip `TTGWIKI-<version>.zip` (or `TTGWIKIW-<version>.zip`) from the [releases](https://git.teletypegames.org/dos/ttgwiki/releases), for example to `C:\TTGWIKI`.
 
-The DOS build needs a packet driver and mTCP's configuration (`MTCPCFG`, filled in by mTCP's `DHCP.EXE`), as DOSINST does; see DOSINST's README for DOSBox and for real machines. In a DOS window of Windows 95/98 Windows owns the network card: use `TTGWIKIW.EXE` there.
+The DOS build needs a packet driver and mTCP's configuration (`MTCPCFG`, filled in by mTCP's `DHCP.EXE`), as WEDOS does; see WEDOS's README for DOSBox and for real machines. In a DOS window of Windows 95/98 Windows owns the network card: use `TTGWIKIW.EXE` there.
 
 ## Usage
 
@@ -93,7 +93,7 @@ The exporter (`server/export.py`) reads the wiki's JSON API, the endpoints the [
 ```
 WIKI.INI          [wiki] format=1, generation, exported, languages=EN,HU, width=78
 EN/INDEX.TXT      the page tree
-EN/FILES.LST      "crc32 size name" of INDEX.TXT and every page (DOSINST's format)
+EN/FILES.LST      "crc32 size name" of INDEX.TXT and every page (WEDOS's format)
 EN/P0000001.TXT   a page
 HU/...
 ```
@@ -145,7 +145,7 @@ The code is in layers; each one uses only the ones below it, and only through th
 | `SOURCE/view` | The screens and the command line output. |
 | `SOURCE/platform` | `exeDir` and the network adapters (mTCP, Winsock). |
 | `SOURCE/app` | `runTtgwiki`: puts the layers together for a machine. |
-| `SOURCE/lib` | [DOSLIB](https://git.teletypegames.org/dos/doslib) as a git subtree, shared with DOSINST, GMENU and BMAGIC: strings, INI, CRC-32, the code pages, the FTP client, the screen and the keyboard, the file system, the test helpers. |
+| `SOURCE/lib` | [DOSLIB](https://git.teletypegames.org/dos/doslib) as a git subtree, shared with WEDOS, GMENU and BMAGIC: strings, INI, CRC-32, the code pages, the FTP client, the screen and the keyboard, the file system, the test helpers. |
 
 The rules of the code (C++98 for Open Watcom, interfaces, names, format) are in `SOURCE/lib/README.md`.
 
@@ -162,7 +162,7 @@ PYTHON=/path/to/python-with-pyftpdlib SOURCE/test/runw32.sh    # needs Wine
 
 ## Releases
 
-Woodpecker (`.woodpecker/warp.yaml`, a `platform: dos` marker) runs the pipeline the WarpEngine of teletypegames.org serves, with the commands of the [dos-tools](https://git.teletypegames.org/build/dos-tools) builder image (Open Watcom, DOSBox Staging, Wine, clang-format): on every push `dos-check` (the code style, the layers, the unit tests of both sides), `dos-build` (`SOURCE/build.sh`) and `dos-test` (`SOURCE/test/run.sh` and `SOURCE/test/runw32.sh`). A push to master that changes the server side deploys it (`.woodpecker/deploy.yaml`). The `vX.Y.Z` tag of a release publishes a Gitea release with `RELEASE_NOTES.md` as its text, `TTGWIKI-vX.Y.Z.zip`, `TTGWIKIW-vX.Y.Z.zip` and the two executables, and publishes the release to the WarpEngine catalog, whose DOS shelf is DOSINST's store: the engine puts both builds there (without `TTGWIKI.CFG`). What a release holds is the `dos` block of `metadata.json`.
+Woodpecker (`.woodpecker/warp.yaml`, a `platform: dos` marker) runs the pipeline the WarpEngine of teletypegames.org serves, with the commands of the [dos-tools](https://git.teletypegames.org/build/dos-tools) builder image (Open Watcom, DOSBox Staging, Wine, clang-format): on every push `dos-check` (the code style, the layers, the unit tests of both sides), `dos-build` (`SOURCE/build.sh`) and `dos-test` (`SOURCE/test/run.sh` and `SOURCE/test/runw32.sh`). A push to master that changes the server side deploys it (`.woodpecker/deploy.yaml`). The `vX.Y.Z` tag of a release publishes a Gitea release with `RELEASE_NOTES.md` as its text, `TTGWIKI-vX.Y.Z.zip`, `TTGWIKIW-vX.Y.Z.zip` and the two executables, and publishes the release to the WarpEngine catalog, whose DOS shelf is WEDOS's store: the engine puts both builds there (without `TTGWIKI.CFG`). What a release holds is the `dos` block of `metadata.json`.
 
 A release is a raised version: raise `version` in `metadata.json` together with `Version` in `SOURCE/app/version.h` (the two have to match), and push it to master. The pipeline tags the commit `vX.Y.Z` itself, and that tag's pipeline makes the release. A push that leaves the version as it is only builds and tests; a tag made by hand still works, but has to match the version. Off master a push builds a `dev-` version, which never reaches the store.
 

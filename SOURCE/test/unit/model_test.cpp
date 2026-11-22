@@ -58,17 +58,17 @@ TEST( pageIndexParsesTheTree ) {
   static char text[PageIndex::TextSize];
   PageIndex index( text );
   strcpy( text, "26\t0\t0\t1789548052\ten\t/\tHome\r\n"
-                "16\t26\t1\t1791920030\thu\t/dos/dosinst\tF\xC5\x91oldal\r\nbroken line\r\n" );
+                "16\t26\t1\t1791920030\thu\t/dos/we-dos\tF\xC5\x91oldal\r\nbroken line\r\n" );
   CHECK_INT( index.parse( CodePage852 ), 2 );
   CHECK_INT( index.at( 1 ).id, 16 );
   CHECK_INT( index.at( 1 ).parent, 26 );
   CHECK_INT( index.at( 1 ).depth, 1 );
   CHECK_STR( index.at( 1 ).locale, "hu" );
-  CHECK_STR( index.at( 1 ).route, "/dos/dosinst" );
+  CHECK_STR( index.at( 1 ).route, "/dos/we-dos" );
   CHECK_STR( index.at( 1 ).title, "F\x8Boldal" );
   CHECK_INT( index.find( 26 ), 0 );
   CHECK_INT( index.find( 99 ), -1 );
-  CHECK_INT( index.findRoute( "/dos/dosinst" ), 1 );
+  CHECK_INT( index.findRoute( "/dos/we-dos" ), 1 );
 }
 
 TEST( lineReaderSplitsStylesAndLinks ) {
