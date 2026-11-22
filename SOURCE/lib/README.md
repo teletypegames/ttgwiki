@@ -1,6 +1,6 @@
 # DOSLIB
 
-The code that the `dos/` programs ([DOSINST](https://git.teletypegames.org/dos/dosinst), [GMENU](https://git.teletypegames.org/dos/gmenu)) share, and the rules their code follows. Each program has it in its `SOURCE/lib` folder as a git subtree, so it builds on its own (also in CI):
+The code that the `dos/` programs ([WEDOS](https://git.teletypegames.org/dos/we-dos), [GMENU](https://git.teletypegames.org/dos/gmenu)) share, and the rules their code follows. Each program has it in its `SOURCE/lib` folder as a git subtree, so it builds on its own (also in CI):
 
 ```sh
 # in the program's repository: take the newest DOSLIB
