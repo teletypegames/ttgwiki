@@ -4,7 +4,11 @@ TTGWIKI – the Teletype Games wiki on DOS: browse, search and print its public 
 
 **Install on Windows 95 and later:** install `TTGWIKIW` with DOSINST, or unzip `TTGWIKIW-<version>.zip` (for example to `C:\TTGWIKIW`) and start `TTGWIKIW.EXE`; it uses Windows' own TCP/IP.
 
-**New in 0.2.0:**
+**New in 0.2.1:**
+
+- The release has its source documentation in the catalog (Doxygen, opened with Open on the catalog page); the program itself did not change
+
+**0.2.0:**
 
 - The export moved to the `WIKI` folder of the Teletype Games FTP server: by default `PORT=21` and `PATH=/WIKI` (port 2121 is closed). An installed 0.1.0 has to be updated, and a `TTGWIKI.CFG` with `PORT=2121` changed
 - The server side is only the exporter; the FTP server is [infra/ftp-server](https://git.teletypegames.org/infra/ftp-server)
