@@ -1,8 +1,8 @@
 TTGWIKI – the Teletype Games wiki on DOS: browse, search and print its public pages, or download them all to read offline.
 
-**Install on DOS:** install `TTGWIKI` with DOSINST, or unzip `TTGWIKI-<version>.zip` to the DOS drive (for example `C:\TTGWIKI`) and start it with `TTGWIKI`. It needs a packet driver and mTCP's `DHCP.EXE`, as DOSINST does. For the Hungarian letters set `CODEPAGE=852` in `TTGWIKI.CFG`.
+**Install on DOS:** install `TTGWIKI` with WEDOS, or unzip `TTGWIKI-<version>.zip` to the DOS drive (for example `C:\TTGWIKI`) and start it with `TTGWIKI`. It needs a packet driver and mTCP's `DHCP.EXE`, as WEDOS does. For the Hungarian letters set `CODEPAGE=852` in `TTGWIKI.CFG`.
 
-**Install on Windows 95 and later:** install `TTGWIKIW` with DOSINST, or unzip `TTGWIKIW-<version>.zip` (for example to `C:\TTGWIKIW`) and start `TTGWIKIW.EXE`; it uses Windows' own TCP/IP.
+**Install on Windows 95 and later:** install `TTGWIKIW` with WEDOS, or unzip `TTGWIKIW-<version>.zip` (for example to `C:\TTGWIKIW`) and start `TTGWIKIW.EXE`; it uses Windows' own TCP/IP.
 
 **New in 0.3.0:**
 
