@@ -7,6 +7,10 @@ Screen &Canvas::screen() {
   return screen_;
 }
 
+int Canvas::rows() const {
+  return screen_.rows();
+}
+
 void Canvas::flush() {
   screen_.flush();
 }

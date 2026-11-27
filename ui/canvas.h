@@ -10,10 +10,12 @@
 
 class Canvas {
 public:
+  /* Rows: the rows of a screen that was not asked for more; rows() tells the real ones. */
   enum { Cols = Screen::Cols, Rows = Screen::Rows };
 
   explicit Canvas( Screen &screen );
   Screen &screen();
+  int rows() const;
   void flush();
 
   static int at( int row, int col );

@@ -1,5 +1,6 @@
 /*
-   A Screen in memory for the unit tests: text() gives a row as text.
+   A Screen in memory for the unit tests: text() gives a row as text. It gives the rows
+   asked for (25 without asking).
 */
 
 #ifndef DOSLIB_TESTING_MEMORY_SCREEN_H
@@ -9,13 +10,15 @@
 
 class MemoryScreen : public Screen {
 public:
-  MemoryScreen() : cursorRow( 0 ), cursorCol( 0 ) {
-    for ( int i = 0; i < Cells; i++ ) cells_[i] = 0x0720;
+  MemoryScreen() : cursorRow( 0 ), cursorCol( 0 ), asked_( 0 ), rows_( Rows ) {
+    for ( int i = 0; i < MaxCells; i++ ) cells_[i] = 0x0720;
   }
-  void begin() {}
+  void setRows( int rows ) { asked_ = rows; }
+  int rows() const { return rows_; }
+  void begin() { rows_ = asked_ >= Rows && asked_ <= MaxRows ? asked_ : Rows; }
   void end() {}
   void put( int pos, char c, unsigned char attr ) {
-    if ( pos >= 0 && pos < Cells ) cells_[pos] = ( (unsigned)attr << 8 ) | (unsigned char)c;
+    if ( pos >= 0 && pos < rows_ * Cols ) cells_[pos] = ( (unsigned)attr << 8 ) | (unsigned char)c;
   }
   unsigned cell( int pos ) const { return cells_[pos]; }
   void flush() {}
@@ -40,7 +43,8 @@ public:
   int cursorRow, cursorCol;
 
 private:
-  unsigned cells_[Cells];
+  int asked_, rows_;
+  unsigned cells_[MaxCells];
 };
 
 #endif
