@@ -1,5 +1,6 @@
 /*
-   TTGWIKI.CFG next to the executable: the server, the language and the code page.
+   TTGWIKI.CFG next to the executable: the server, the language, the code page and the
+   rows of the screen.
 */
 
 #ifndef TTGWIKI_MODEL_CONFIG_H
@@ -18,6 +19,7 @@ struct Config {
   char lang[4];  /* EN, HU: the language folder of the export */
   CodePage codePage;
   char cache[64]; /* where the pages are kept; empty: CACHE next to the executable */
+  int rows;       /* ROWS=25 or ROWS=50 (more than 25: a tall screen); 0: as the screen is */
 
   Config();
   /* SERVER= ... lines; the defaults stay for what is missing. false: a CODEPAGE that is

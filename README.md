@@ -1,13 +1,13 @@
 # TTGWIKI – the Teletype Games wiki on DOS
 
-TTGWIKI reads the public pages of the [Teletype Games wiki](https://wiki.teletypegames.org) on DOS (`TTGWIKI.EXE`, mTCP over a packet driver) and on Windows 95 and later (`TTGWIKIW.EXE`, Winsock, in a console window). A DOS machine cannot speak HTTPS, so the server side of this repository exports the wiki as plain text files, and the Teletype Games FTP server ([infra/ftp-server](https://git.teletypegames.org/infra/ftp-server)) shares them over anonymous, read-only FTP, next to [WEDOS](https://git.teletypegames.org/dos/we-dos)'s store. TTGWIKI downloads a page when it is read and keeps it, so a page read once can be read again offline; `F6` (or `TTGWIKI SYNC`) downloads every page.
+TTGWIKI reads the public pages of the [Teletype Games wiki](https://wiki.teletypegames.org) on DOS (`TTGWIKI.EXE`, mTCP over a packet driver) and on Windows 95 and later (`TTGWIKIW.EXE`, Winsock, in a console window). A DOS machine cannot speak HTTPS, so the server side of this repository exports the wiki as plain text files, and the Teletype Games FTP server ([infra/ftp-server](https://git.teletypegames.org/infra/ftp-server)) shares them over anonymous, read-only FTP, next to [WEDOS](https://git.teletypegames.org/dos/we-dos)'s store. TTGWIKI downloads a page when it is read and keeps it, so a page read once can be read again offline; `F6` (or `TTGWIKI SYNC`) downloads every page. `F3` (or `TTGWIKI FIND`) searches the text of every page, and the screen can be 50 rows tall (`ROWS=50`).
 
 ```
  wiki.teletypegames.org (Grav)
         │  /custom/sitemap.json, /custom/page.json (inside the wiki's docker network)
         ▼
  exporter (server/export.py)   at start, then every 15 minutes
-        │  WIKI.INI, EN/INDEX.TXT, EN/FILES.LST, EN/P0000001.TXT, ... HU/...
+        │  WIKI.INI, EN/INDEX.TXT, EN/FILES.LST, EN/P0000001.TXT, EN/WORDS_A.TXT, ... HU/...
         ▼
  FTP (infra/ftp-server)        ftp://ftp.teletypegames.org/WIKI, anonymous, read-only
         │
@@ -44,6 +44,7 @@ The DOS build needs a packet driver and mTCP's configuration (`MTCPCFG`, filled 
 TTGWIKI                    browse the wiki
 TTGWIKI SYNC [lang]        download every page of a language, to read them offline
 TTGWIKI SHOW route [lang]  print a page as plain text: TTGWIKI SHOW /dos/gmenu > PRN
+TTGWIKI FIND words [lang]  list the pages that have every word: TTGWIKI FIND game menu
 ```
 
 **The contents** list the pages as a tree, with the date of their last change. A page that has no translation is shown in the language it is written in, marked with that language (`[en]`).
@@ -53,6 +54,7 @@ TTGWIKI SHOW route [lang]  print a page as plain text: TTGWIKI SHOW /dos/gmenu >
 | Up/Down/PgUp/PgDn/Home/End | select a page |
 | Enter | read it |
 | typing | search the titles (and the routes), ignoring case and accents; Backspace deletes, Esc clears |
+| F3 | search the text: type words, Enter lists the pages that have every one of them; Esc goes back to every page |
 | F2 | the other language |
 | F5 | look for a new export |
 | F6 | download every page of the language |
@@ -70,6 +72,8 @@ TTGWIKI SHOW route [lang]  print a page as plain text: TTGWIKI SHOW /dos/gmenu >
 | F5 | look for a new export |
 | Esc | back to the contents |
 
+**The text search** (F3, `FIND`) finds the pages that have every word typed, as a word or as the start of one (`dos` finds DOSBox too), ignoring case and accents. Words of one or two letters are left out. It downloads only the word files of the words' first letters (a few KB to 25 KB each) and keeps them like the pages, so a search that was made once, or after F6, works offline too.
+
 At start, and on F5, TTGWIKI reads `WIKI.INI` from the server. When its generation is the one already on the disk, nothing else is downloaded. When it is new, the new page list comes, and the pages on the disk that changed are deleted, so they are downloaded again when they are read. When the server cannot be reached, TTGWIKI shows the error and works from the disk.
 
 ## Settings: TTGWIKI.CFG
@@ -85,6 +89,7 @@ At start, and on F5, TTGWIKI reads `WIKI.INI` from the server. When its generati
 | `LANG` | `EN` | the language at start: `EN` or `HU` |
 | `CODEPAGE` | `437` | the code page of the screen: `437` (US), or `852` (Central European, with every Hungarian letter). In 437 the letters it lacks become a near one (ő → ö, ű → ü). |
 | `CACHE` | `CACHE` next to the executable | where the pages are kept |
+| `ROWS` | the rows the screen has | `50`: a tall screen, 80x50 on a VGA (80x43 on an EGA; a CGA or a monochrome card stays at 25), and a console window of 50 rows on Windows if the screen can show it. `25`: 80x25. Without it TTGWIKI uses the rows the screen has (after `MODE CON LINES=50` it is 50 too). The screen gets back its own rows when TTGWIKI quits. |
 
 ## The export
 
@@ -93,8 +98,9 @@ The exporter (`server/export.py`) reads the wiki's JSON API, the endpoints the [
 ```
 WIKI.INI          [wiki] format=1, generation, exported, languages=EN,HU, width=78
 EN/INDEX.TXT      the page tree
-EN/FILES.LST      "crc32 size name" of INDEX.TXT and every page (WEDOS's format)
+EN/FILES.LST      "crc32 size name" of INDEX.TXT, every page and the word files (WEDOS's format)
 EN/P0000001.TXT   a page
+EN/WORDS_A.TXT    the words starting with A (the text search)
 HU/...
 ```
 
@@ -103,6 +109,7 @@ The files are UTF-8 with CRLF line ends; TTGWIKI turns them into the code page o
 - **`INDEX.TXT`**: a page per line in tree order (a parent before its children), tab-separated: `id`, `parent id` (0: none), `depth`, `modified` (Unix time), `locale` (the language the page is written in), `route`, `title`.
 - **A page** starts with header lines, `TITLE=`, `ROUTE=`, `LOCALE=`, `MODIFIED=`, `URL=`, and `L=<n> <target>` for each link (`#<id>` for a page of the export, the URL for anything else), then an empty line, then the lines of the page.
 - **A line of a page** has at most 78 characters. Control bytes, which take no column, mark the styles and the links: `01h c` starts style `c` (`0` normal, `1`-`3` headings, `b` bold, `i` italic, `c` inline code, `p` code block, `q` quote, `r` rule, `t` table frame, `h` table header), `02h n 03h` starts link `n`, `04h` ends it. Every line starts in the normal style, outside a link: a style or a link that runs over the end of a line starts again on the next one.
+- **The word files** (`WORDS_A.TXT` ... `WORDS_Z.TXT`, `WORDS_0.TXT` ... `WORDS_9.TXT`, only the ones that have words) hold the words of a language's pages, the title and the text: a line is a word and the ids of its pages, ascending (`GMENU 3,12,40`), sorted by the word. A word is folded (upper case without accents: `Ősz` is `OSZ`, as TTGWIKI folds what is typed) and has 3 to 30 letters and digits; a line is at most 250 bytes, a longer id list goes on in another line of the same word. They are split by the first letter so that a DOS machine downloads only what a search needs: on the wiki of 2026-11 the 36 files of a language are 140 KB in English and 255 KB in Hungarian together, the biggest one 23 KB. A client older than the word files downloads them on F6 too, and leaves them alone otherwise.
 - **A page keeps its id**: the ids are read back from the `INDEX.TXT` files of the export, a new route gets the next number. The two languages share the ids, so F2 can show the same page.
 
 `server/render.py` turns the HTML of a page (Grav's rendered `content`) into these lines: paragraphs and lists wrapped, code blocks kept (a longer line goes on after `»`), tables drawn with frames when they fit (their cells wrapped) or as "column: value" lines when they do not, images as `[Image: alt text]`. A link to a page that is not exported is plain text.
@@ -138,9 +145,9 @@ The code is in layers; each one uses only the ones below it, and only through th
 
 | Folder | Layer |
 |---|---|
-| `SOURCE/model` | The data and its rules, no I/O: `Config`, `WikiInfo` (WIKI.INI), `Manifest` (FILES.LST), `PageIndex` (INDEX.TXT), the lines of a page (`page_line`: styles, links), `History`, the search. |
-| `SOURCE/repository` | Interfaces of the storage: the export on the server (`RemoteWiki`), the pages on the disk (`PageStore`), a page read a line at a time (`PageSource`). Their implementations: `repository/ftp` and `repository/fs`. |
-| `SOURCE/service` | What TTGWIKI does: `SyncService` (the export and the disk in step: a new generation deletes the changed pages, a page is downloaded when it is read and checked against FILES.LST) and `ReaderService` (the page being read). |
+| `SOURCE/model` | The data and its rules, no I/O: `Config`, `WikiInfo` (WIKI.INI), `Manifest` (FILES.LST), `PageIndex` (INDEX.TXT), the lines of a page (`page_line`: styles, links), `History`, the title search, the text search (`WordQuery`: the query and the word files). |
+| `SOURCE/repository` | Interfaces of the storage: the export on the server (`RemoteWiki`), the pages on the disk (`PageStore`), a page read a line at a time (`PageSource`), a word file read a line at a time (`LineFile`). Their implementations: `repository/ftp` and `repository/fs`. |
+| `SOURCE/service` | What TTGWIKI does: `SyncService` (the export and the disk in step: a new generation deletes the changed pages and word files, a file is downloaded when it is needed and checked against FILES.LST), `ReaderService` (the page being read) and `SearchService` (the text search). |
 | `SOURCE/controller` | The browser (`BrowserController`: the contents and the reader) and the command line (`CliController`). |
 | `SOURCE/view` | The screens and the command line output. |
 | `SOURCE/platform` | `exeDir` and the network adapters (mTCP, Winsock). |
@@ -151,9 +158,9 @@ The rules of the code (C++98 for Open Watcom, interfaces, names, format) are in 
 
 ## Tests
 
-- `python3 -m unittest discover -s server/test`: the renderer (wrapping, styles, links, lists, code, quotes, the three ways of a table) and the exporter on a fake wiki (the tree, the ids that stay, the private pages, a new generation only on a change, a failed run that changes nothing).
-- `SOURCE/test/unit/run.sh`: the client's unit tests on the host with its C++ compiler, on a fake server and an in-memory disk: the models, the page reader, the sync (a new generation, a bad checksum, an export that changed under a download, offline) and the browser with scripted keys. It checks the layers first.
-- `SOURCE/test/run.sh`: the exporter writes a small export from a fake wiki (`server/test/fixture.py`), `SOURCE/test/ftpserver.py` shares it on the host as `WIKI`, and TTGWIKI.EXE runs in a headless DOSBox Staging: it prints pages, downloads them all, follows a new export, prints Hungarian in code page 852, reads offline, and browses with a test build (`build.sh test`) that takes its keys from `TESTKEYS` and saves the screen when they run out. `SOURCE/test/runw32.sh` does the same with TTGWIKIW.EXE under Wine, from the command line.
+- `python3 -m unittest discover -s server/test`: the renderer (wrapping, styles, links, lists, code, quotes, the three ways of a table) and the exporter on a fake wiki (the tree, the ids that stay, the private pages, the word files, a new generation only on a change, a failed run that changes nothing).
+- `SOURCE/test/unit/run.sh`: the client's unit tests on the host with its C++ compiler, on a fake server and an in-memory disk: the models, the page reader, the sync (a new generation, a bad checksum, an export that changed under a download, offline), the text search, and the browser with scripted keys, also on 50 rows. It checks the layers first.
+- `SOURCE/test/run.sh`: the exporter writes a small export from a fake wiki (`server/test/fixture.py`), `SOURCE/test/ftpserver.py` shares it on the host as `WIKI`, and TTGWIKI.EXE runs in a headless DOSBox Staging: it prints pages, downloads them all, searches the text, follows a new export, prints Hungarian in code page 852, reads offline, and browses with a test build (`build.sh test`) that takes its keys from `TESTKEYS` and saves the screen when they run out, also with `ROWS=50`. `SOURCE/test/runw32.sh` does the same with TTGWIKIW.EXE under Wine, from the command line.
 
 ```sh
 PYTHON=/path/to/python-with-pyftpdlib SOURCE/test/run.sh

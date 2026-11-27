@@ -9,6 +9,7 @@
 #include "../model/config.h"
 #include "../model/manifest.h"
 #include "../model/page_index.h"
+#include "../model/word_query.h"
 #include "../repository/page_store.h"
 #include "../repository/remote_wiki.h"
 
@@ -122,9 +123,7 @@ SyncService::Result SyncService::refresh( const char *lang ) {
   return result;
 }
 
-bool SyncService::downloadPage( const char *lang, unsigned id ) {
-  char name[13];
-  pageFileName( id, name );
+bool SyncService::downloadFile( const char *lang, const char *name ) {
   if ( !remote_.connect() ) return false;
   reportf( progress_, "Downloading %s %s", lang, name );
   bool ok = download( lang, name, buffers_.manifest );
@@ -135,8 +134,27 @@ bool SyncService::downloadPage( const char *lang, unsigned id ) {
 bool SyncService::ensurePage( const char *lang, unsigned id ) {
   char name[13];
   pageFileName( id, name );
+  return ensureFile( lang, name );
+}
+
+bool SyncService::inExport( const char *name ) const {
+  ManifestEntry entry;
+  return Manifest( buffers_.manifest ).find( name, entry );
+}
+
+bool SyncService::hasWordIndex() const {
+  Manifest manifest( buffers_.manifest );
+  ManifestEntry entry;
+  const char *pos = manifest.first();
+  while ( manifest.next( pos, entry ) ) {
+    if ( isWordFile( entry.name ) ) return true;
+  }
+  return false;
+}
+
+bool SyncService::ensureFile( const char *lang, const char *name ) {
   if ( store_.has( lang, name ) ) return true;
-  if ( downloadPage( lang, id ) ) return true;
+  if ( downloadFile( lang, name ) ) return true;
   /* The export may have changed since the last refresh: once more with the new one. */
   char first[Error::Size];
   copyStr( first, error_.text(), sizeof( first ) );
@@ -144,13 +162,13 @@ bool SyncService::ensurePage( const char *lang, unsigned id ) {
     error_.set( "%s", first );
     return false;
   }
-  return downloadPage( lang, id );
+  return downloadFile( lang, name );
 }
 
 int SyncService::downloadAll( const char *lang ) {
   Manifest manifest( buffers_.manifest );
   ManifestEntry entry;
-  int missing = 0, done = 0;
+  int missing = 0, done = 0, files = 0;
   const char *pos = manifest.first();
   while ( manifest.next( pos, entry ) ) {
     if ( !store_.has( lang, entry.name ) ) missing++;
@@ -160,12 +178,13 @@ int SyncService::downloadAll( const char *lang ) {
   pos = manifest.first();
   while ( manifest.next( pos, entry ) ) {
     if ( store_.has( lang, entry.name ) ) continue;
-    reportf( progress_, "Downloading %d of %d", done + 1, missing );
+    reportf( progress_, "Downloading %d of %d", files + 1, missing );
     if ( !download( lang, entry.name, buffers_.manifest ) ) {
       remote_.disconnect();
       return -1;
     }
-    done++;
+    files++;
+    if ( !isWordFile( entry.name ) ) done++;
   }
   remote_.disconnect();
   return done;

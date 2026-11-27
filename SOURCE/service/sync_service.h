@@ -39,8 +39,15 @@ public:
   Result refresh( const char *lang );
   /* The page is on the disk (downloaded when it is not). */
   bool ensurePage( const char *lang, unsigned id );
-  /* Every page of lang that is not on the disk yet: how many were downloaded, -1 on an
-     error. */
+  /* A file of the export (a page, a word file) is on the disk: downloaded when it is
+     not, and when FILES.LST does not have it, once more after a refresh. */
+  bool ensureFile( const char *lang, const char *name );
+  /* FILES.LST of the disk has the file. */
+  bool inExport( const char *name ) const;
+  /* FILES.LST of the disk has word files: the export can be searched. */
+  bool hasWordIndex() const;
+  /* Every file of lang that is not on the disk yet (the pages and the word files): how
+     many pages were downloaded, -1 on an error. */
   int downloadAll( const char *lang );
   /* The export as last seen: the generation and the languages. */
   const WikiInfo &info() const;
@@ -51,7 +58,7 @@ private:
   Result refreshConnected( const char *lang );
   void dropStale( const char *lang );
   bool download( const char *lang, const char *name, const char *manifestText );
-  bool downloadPage( const char *lang, unsigned id );
+  bool downloadFile( const char *lang, const char *name );
   bool loadIndex( const char *lang );
 
   RemoteWiki &remote_;

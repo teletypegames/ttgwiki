@@ -72,7 +72,7 @@ class ExportTest(unittest.TestCase):
         self.run_export()
         for lang in ("EN", "HU"):
             names = os.listdir(os.path.join(self.dir, lang))
-            self.assertEqual(len(names), 6)
+            self.assertEqual(len([n for n in names if not n.startswith("WORDS_")]), 6)
             for name in names:
                 self.assertNotIn("no</p>", self.read(lang, name))
                 self.assertNotIn("Secret", self.read(lang, name))
@@ -98,6 +98,34 @@ class ExportTest(unittest.TestCase):
                 data = f.read()
             self.assertEqual(int(crc, 16), zlib.crc32(data))
             self.assertEqual(int(size), len(data))
+
+    def words(self, lang, name):
+        return dict(line.split(" ", 1) for line in self.read(lang, name).split("\r\n") if line)
+
+    def test_word_files(self):
+        self.wiki.add("/dos", "DOS", "<p>Űrlények <code>GMENU.BAT</code> az őszön, go</p>", "/hu")
+        self.run_export()
+        ids = {r[5]: r[0] for r in self.index("HU")}
+        names = sorted(n for n in os.listdir(os.path.join(self.dir, "HU")) if n.startswith("WORDS_"))
+        self.assertEqual(names, ["WORDS_%s.TXT" % c for c in "ABDGHOPSU"])
+        self.assertEqual(self.words("HU", "WORDS_U.TXT"), {"UNDER": ids["/secret/open"], "URLENYEK": ids["/dos"]})
+        self.assertEqual(self.words("HU", "WORDS_O.TXT"), {"OPEN": ids["/secret/open"], "OSZON": ids["/dos"]})
+        self.assertEqual(self.words("HU", "WORDS_G.TXT")["GMENU"],
+                         ",".join(sorted([ids["/dos"], ids["/dos/gmenu"]], key=int)))
+        self.assertNotIn("GO", self.words("HU", "WORDS_G.TXT"), "a word of two letters is left out")
+        self.assertNotIn("SECRET", self.words("HU", "WORDS_S.TXT"), "the private page is not searchable")
+        self.assertIn("WORDS_U.TXT", self.read("HU", "FILES.LST"))
+
+    def test_a_long_id_list_goes_on_in_another_line(self):
+        for n in range(200):
+            self.wiki.add("/many/p%d" % n, "Page %d" % n, "<p>common</p>")
+        self.run_export()
+        lines = [line for line in self.read("EN", "WORDS_C.TXT").split("\r\n") if line.startswith("COMMON ")]
+        self.assertGreater(len(lines), 1)
+        self.assertTrue(all(len(line) + 2 <= export.WORD_LINE for line in lines))
+        ids = [int(i) for line in lines for i in line.split(" ", 1)[1].split(",")]
+        self.assertEqual(len(ids), 200)
+        self.assertEqual(ids, sorted(ids))
 
     def test_unchanged_wiki_keeps_the_generation(self):
         self.run_export()

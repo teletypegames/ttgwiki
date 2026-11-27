@@ -3,7 +3,8 @@
 # (server/test/fixture.py), the test FTP server
 # (SOURCE/test/ftpserver.py) shares it on the host as WIKI, and
 # TTGWIKI runs in a headless DOSBox Staging (NE2000 + mTCP): it prints pages, downloads
-# them all, follows a new export, reads offline, and browses with scripted keys.
+# them all, follows a new export, searches the text, reads offline, and browses with
+# scripted keys, also on a 50-row screen.
 #
 #   PYTHON   python with pyftpdlib (default: python3)
 #   DOSBOX   DOSBox Staging binary (default: the macOS app)
@@ -68,7 +69,7 @@ print("".join(l + "\n" for l in t.split("\n") if not l.startswith(("Resolving ",
     "$WORK/c/OUT.TXT" > "$WORK/out.txt"
   if [ -n "$KEYS" ]; then
     "$PYTHON" -c 'import sys; d = open(sys.argv[1], "rb").read()
-for y in range(25): print("".join(chr(c) if 32 <= c < 127 else "~" if c == 26 else " " for c in d[y * 160:y * 160 + 160:2]).rstrip())' \
+for y in range(len(d) // 160): print("".join(chr(c) if 32 <= c < 127 else "~" if c == 26 else " " for c in d[y * 160:y * 160 + 160:2]).rstrip())' \
       "$WORK/c/SCREEN.BIN" > "$WORK/screen.txt"
   fi
 }
@@ -99,6 +100,16 @@ cmp -s "$WORK/c/TTGWIKI/CACHE/EN/P0000002.TXT" "$WORK/export/EN/P0000002.TXT" &&
   fail "a page is byte exact"
 if grep -rq "never exported" "$WORK/export"; then fail "the private page is not in the export"; else
   ok "the private page is not in the export"; fi
+
+echo "--- the text search"
+run_dos "FIND game menu" "FIND tools EN" "FIND zebra" "FIND go"
+cat "$WORK/out.txt"
+check '^EN: 1 pages have every word$' "FIND finds the page with every word"
+check '^/dos/gmenu +GMENU$' "FIND lists the route and the title"
+check '^/dos +DOS tools$' "FIND finds a word of the title"
+check '^EN: 0 pages have every word$' "FIND of a word that is nowhere finds nothing"
+check '^Error: Give words of 3 letters or more$' "FIND of a short word fails"
+[ -f "$WORK/c/TTGWIKI/CACHE/EN/WORDS_G.TXT" ] && ok "the word file is kept" || fail "the word file is kept"
 
 echo "--- a new export"
 "$PYTHON" ../../server/test/fixture.py "$WORK/export" 2 > /dev/null
@@ -141,5 +152,21 @@ KEYS="2267 226D 1C0D" run_dos
 check_screen '^ GMENU +EN' "typing searches, Enter reads what it found"
 KEYS="1C0D 3C00" run_dos
 check_screen '^ Kezd.lap +HU' "F2 shows the page in Hungarian"
+KEYS="3D00 2267 2261 226D 2265 1C0D" run_dos
+cat "$WORK/screen.txt"
+check_screen '^ Text: game +1/1$' "F3 searches the text"
+check_screen '^ GMENU +1970-01-01$' "the contents show the pages found"
+check_screen '^ 1 pages have every word$' "the status line tells what was found"
+
+echo "--- 50 rows"
+printf 'SERVER=10.0.2.2\r\nPORT=%s\r\nLANG=EN\r\nCODEPAGE=437\r\nROWS=50\r\n' "$PORT" > "$WORK/c/TTGWIKI/TTGWIKI.CFG"
+KEYS="4700" run_dos
+cat "$WORK/screen.txt"
+[ "$(wc -l < "$WORK/screen.txt" | tr -d ' ')" = 50 ] && ok "ROWS=50 gives a screen of 50 rows" ||
+  fail "ROWS=50 gives a screen of 50 rows"
+if sed -n '50p' "$WORK/screen.txt" | grep -q '^ Enter Read'; then ok "the keys are on the last row"; else
+  fail "the keys are on the last row"; fi
+if sed -n '49p' "$WORK/screen.txt" | grep -q '^ 3 pages, export #2'; then ok "the status line is above them"; else
+  fail "the status line is above them"; fi
 
 [ $FAILED = 0 ] && echo "All tests passed." || { echo "Some tests FAILED."; exit 1; }

@@ -104,14 +104,14 @@ bool FakeRemote::download( const char *path, ByteSink &sink, const char * ) {
 }
 
 KeepScreen::KeepScreen( Screen &screen ) : screen_( screen ), kept_( false ) {
-  for ( int r = 0; r < 25; r++ ) rows_[r][0] = 0;
+  for ( int r = 0; r < 50; r++ ) rows_[r][0] = 0;
 }
 
 unsigned KeepScreen::scriptEnded() {
   if ( !kept_ ) {
-    for ( int r = 0; r < 25; r++ ) {
+    for ( int r = 0; r < 50; r++ ) {
       int n = 0;
-      for ( int c = 0; c < 80; c++ ) {
+      for ( int c = 0; c < 80 && r < screen_.rows(); c++ ) {
         rows_[r][c] = (char)( screen_.cell( r * 80 + c ) & 0xFF );
         attrs_[r][c] = (unsigned char)( screen_.cell( r * 80 + c ) >> 8 );
         if ( rows_[r][c] != ' ' ) n = c + 1;
@@ -128,7 +128,7 @@ const char *KeepScreen::row( int n ) const {
 }
 
 bool KeepScreen::contains( const char *text ) const {
-  for ( int r = 0; r < 25; r++ ) {
+  for ( int r = 0; r < 50; r++ ) {
     if ( strstr( rows_[r], text ) ) return true;
   }
   return false;

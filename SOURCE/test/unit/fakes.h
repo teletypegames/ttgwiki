@@ -53,7 +53,8 @@ public:
 
 class Screen;
 
-/* Keeps the screen (as text, row by row) when the keys run out, then presses Esc. */
+/* Keeps the screen (as text, row by row, up to 50 rows) when the keys run out, then
+   presses Esc. */
 class KeepScreen : public ScriptEnd {
 public:
   explicit KeepScreen( Screen &screen );
@@ -66,8 +67,8 @@ public:
 private:
   Screen &screen_;
   bool kept_;
-  char rows_[25][81];
-  unsigned char attrs_[25][80];
+  char rows_[50][81];
+  unsigned char attrs_[50][80];
 };
 
 #endif

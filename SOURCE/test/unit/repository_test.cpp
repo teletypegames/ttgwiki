@@ -4,6 +4,7 @@
 #include "../../lib/net/file_sink.h"
 #include "../../lib/testing/host/fake_file_system.h"
 #include "../../lib/testing/host/minitest.h"
+#include "../../repository/fs/fs_line_file.h"
 #include "../../repository/fs/fs_page_source.h"
 #include "../../repository/fs/fs_page_store.h"
 
@@ -82,4 +83,28 @@ TEST( pageSourceLeavesOutWhatDoesNotFit ) {
   CHECK_INT( source.lineCount(), 2 );
   CHECK( !source.open( "EN", 2 ) );
   CHECK_STR( error.text(), "Cannot read C:\\CACHE\\EN\\P0000002.TXT" );
+}
+
+TEST( lineFileReadsTheLinesOfAFile ) {
+  FakeFileSystem fs;
+  Error error;
+  FsPageStore store( fs, error );
+  store.setRoot( "C:\\CACHE" );
+  char text[1200];
+  strcpy( text, "DOS 1,2\r\nLONG " );
+  for ( int i = 0; i < 100; i++ ) strcat( text, "1234567890" );
+  strcat( text, "\r\nLAST 3" );
+  fs.add( "C:\\CACHE\\EN\\WORDS_D.TXT", text );
+  FsLineFile file( fs, store, error );
+  CHECK( !file.open( "EN", "WORDS_X.TXT" ) );
+  CHECK( file.open( "EN", "WORDS_D.TXT" ) );
+  char line[64];
+  CHECK( file.next( line, sizeof( line ) ) );
+  CHECK_STR( line, "DOS 1,2" );
+  CHECK( file.next( line, sizeof( line ) ) );
+  CHECK_INT( (int)strlen( line ), 63 );
+  CHECK( file.next( line, sizeof( line ) ) );
+  CHECK_STR( line, "LAST 3" );
+  CHECK( !file.next( line, sizeof( line ) ) );
+  file.close();
 }

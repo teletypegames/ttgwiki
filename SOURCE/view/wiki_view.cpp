@@ -10,7 +10,7 @@
 #include "../model/page_index.h"
 #include "../model/page_line.h"
 
-enum { Cols = Canvas::Cols, InfoRow = 22, StatusRow = Canvas::Rows - 2, KeysRow = Canvas::Rows - 1 };
+enum { Cols = Canvas::Cols };
 
 static const unsigned char AttrTitle = 0x1F;
 static const unsigned char AttrHead = 0x70;
@@ -51,6 +51,27 @@ void WikiView::close() {
   canvas_.screen().end();
 }
 
+int WikiView::listRows() const {
+  return canvas_.rows() - 5;
+}
+
+int WikiView::textRows() const {
+  int rows = canvas_.rows() - 3;
+  return rows > MaxTextRows ? MaxTextRows : rows;
+}
+
+int WikiView::infoRow() const {
+  return canvas_.rows() - 3;
+}
+
+int WikiView::statusRow() const {
+  return canvas_.rows() - 2;
+}
+
+int WikiView::keysRow() const {
+  return canvas_.rows() - 1;
+}
+
 void WikiView::titleBar( const char *left, const char *right ) {
   int width = strlen( right );
   canvas_.field( 0, 0, left, AttrTitle, Cols - width - 1 );
@@ -66,7 +87,7 @@ void WikiView::drawTreeRow( int row, const TreeState &state, int item ) {
   const PageEntry &page = state.index->at( state.visible[item] );
   bool selected = item == state.cursor->sel();
   unsigned char attr = selected ? AttrSelected : AttrText;
-  int indent = state.query[0] ? 0 : page.depth * 2;
+  int indent = state.query[0] || state.textMode == TextFound ? 0 : page.depth * 2;
   if ( indent > 24 ) indent = 24;
   char line[Cols + 1];
   snprintf( line, sizeof( line ), " %*s%s", indent, "", page.title );
@@ -92,22 +113,26 @@ void WikiView::drawTree( const TreeState &state ) {
   titleBar( left, right );
   canvas_.field( 0, 1, " Page", AttrHead, 66 );
   canvas_.field( 66, 1, "Updated", AttrHead, Cols - 66 );
-  for ( int row = 0; row < ListRows; row++ ) drawTreeRow( row, state, state.cursor->top() + row );
+  for ( int row = 0; row < listRows(); row++ ) drawTreeRow( row, state, state.cursor->top() + row );
   char info[Cols + 1];
-  if ( state.query[0] ) {
+  if ( state.textMode != NoText ) {
+    snprintf( info, sizeof( info ), " Text: %s%s", state.text, state.textMode == TypingText ? "_" : "" );
+    canvas_.field( 0, infoRow(), info, AttrSearch, 66 );
+  }
+  else if ( state.query[0] ) {
     snprintf( info, sizeof( info ), " Search: %s_", state.query );
-    canvas_.field( 0, InfoRow, info, AttrSearch, 66 );
+    canvas_.field( 0, infoRow(), info, AttrSearch, 66 );
   }
   else {
     const char *route = state.count ? state.index->at( state.visible[state.cursor->sel()] ).route : "";
     snprintf( info, sizeof( info ), " %s", route );
-    canvas_.field( 0, InfoRow, info, AttrDim, 66 );
+    canvas_.field( 0, infoRow(), info, AttrDim, 66 );
   }
   snprintf( info, sizeof( info ), "%d/%d", state.count ? state.cursor->sel() + 1 : 0, state.count );
-  canvas_.field( 66, InfoRow, info, AttrDim, Cols - 66 );
-  canvas_.field( 0, KeysRow, "", 0x70, Cols );
-  canvas_.footer( Canvas::at( KeysRow, 0 ),
-                  " ~Enter~ Read  ~Type~ Search  ~F2~ Language  ~F5~ Refresh  ~F6~ Download all  ~Esc~ Quit" );
+  canvas_.field( 66, infoRow(), info, AttrDim, Cols - 66 );
+  canvas_.field( 0, keysRow(), "", 0x70, Cols );
+  canvas_.footer( Canvas::at( keysRow(), 0 ),
+                  " ~Enter~ Read  ~Type~ Title  ~F3~ Text  ~F2~ Language  ~F5~ Refresh  ~F6~ All  ~Esc~ Quit" );
   canvas_.flush();
 }
 
@@ -135,24 +160,24 @@ void WikiView::drawPageLine( int row, const char *line, const ReaderState &state
 
 void WikiView::drawPage( const ReaderState &state ) {
   char right[32];
-  int last = state.top + TextRows < state.lineCount ? state.top + TextRows : state.lineCount;
+  int last = state.top + textRows() < state.lineCount ? state.top + textRows() : state.lineCount;
   snprintf( right, sizeof( right ), "%s  %d-%d/%d ", state.lang, state.lineCount ? state.top + 1 : 0, last,
             state.lineCount );
   char left[Cols];
   snprintf( left, sizeof( left ), " %s", state.title );
   titleBar( left, right );
-  for ( int row = 0; row < TextRows; row++ ) {
+  for ( int row = 0; row < textRows(); row++ ) {
     if ( row < state.shown ) drawPageLine( row, state.lines[row], state, state.top + row );
     else canvas_.field( 0, TextTop + row, "", AttrText, Cols );
   }
-  canvas_.field( 0, KeysRow, "", 0x70, Cols );
-  canvas_.footer( Canvas::at( KeysRow, 0 ),
+  canvas_.field( 0, keysRow(), "", 0x70, Cols );
+  canvas_.footer( Canvas::at( keysRow(), 0 ),
                   " ~Tab~ Next link  ~Enter~ Follow  ~Bksp~ Back  ~F2~ Language  ~Esc~ Contents" );
   canvas_.flush();
 }
 
 void WikiView::status( const char *text, unsigned char attr ) {
-  canvas_.field( 0, StatusRow, text, attr, Cols );
+  canvas_.field( 0, statusRow(), text, attr, Cols );
   canvas_.flush();
 }
 

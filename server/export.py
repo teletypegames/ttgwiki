@@ -6,8 +6,9 @@ the export the FTP server shares:
 
     WIKI.INI          format, generation, when, languages, line width
     EN/INDEX.TXT      the page tree, one page per line
-    EN/FILES.LST      "crc32 size path" of INDEX.TXT and the pages (as WEDOS's)
+    EN/FILES.LST      "crc32 size path" of INDEX.TXT, the pages and the word files (as WEDOS's)
     EN/P0000001.TXT   a page
+    EN/WORDS_A.TXT    the words of the pages that start with A (the text search)
     HU/...
 
 The text files are UTF-8 with CRLF line ends. INDEX.TXT has tab-separated fields:
@@ -18,6 +19,17 @@ in tree order (a parent before its children; 0 is no parent). A page file starts
 header lines (TITLE=, ROUTE=, LOCALE=, MODIFIED=, URL=, and L=<n> <target> for each
 link: '#<id>' for a page of the export, a URL for anything else), then an empty line,
 then the lines of the page (see render.py).
+
+The word files are the text search: the words of a language's pages (the title and the
+text), folded (upper case, without accents: "Ősz" is OSZ, as TTGWIKI folds what is
+typed), at least MIN_WORD and at most MAX_WORD letters or digits, in a file for the first
+character (WORDS_A.TXT ... WORDS_Z.TXT, WORDS_0.TXT ... WORDS_9.TXT; a file only when
+it has words). A line is a word and the ids of the pages that have it:
+
+    GMENU 3,12,40
+
+sorted by the word, the ids ascending; a line has at most WORD_LINE bytes with its line
+end, a longer id list goes on in another line of the same word.
 
 A page keeps its id for good: the ids are read back from the INDEX.TXT files of the
 export, new routes get the next free number. Private pages (login-protected on the
@@ -40,18 +52,24 @@ Settings come from the environment:
 import datetime
 import json
 import os
+import re
 import shutil
 import sys
 import time
 import traceback
 import urllib.parse
 import urllib.request
+import unicodedata
 import zlib
 
-from render import WIDTH, render
+from render import WIDTH, render, visible
 
 FORMAT = 1
 TIMEOUT = 30
+MIN_WORD = 3
+MAX_WORD = 30
+WORD_LINE = 250
+WORD_PREFIX = "WORDS_"
 
 
 def log(message):
@@ -179,6 +197,39 @@ def files_list(files):
     return crlf(lines)
 
 
+def fold(text):
+    """Upper case without accents, as TTGWIKI folds a letter: Ő -> O, ű -> U."""
+    decomposed = unicodedata.normalize("NFKD", text)
+    return "".join(c for c in decomposed if not unicodedata.combining(c)).upper()
+
+
+def words_of(text):
+    """The words of a text for the search: runs of A-Z and 0-9 after folding."""
+    return {w for w in re.findall(r"[A-Z0-9]+", fold(text)) if MIN_WORD <= len(w) <= MAX_WORD}
+
+
+def word_files(pages):
+    """The word files of pages, (id, title, lines) each: name -> bytes."""
+    found = {}
+    for page_id, title, lines in pages:
+        for word in words_of(" ".join([title] + [visible(line) for line in lines])):
+            found.setdefault(word, set()).add(page_id)
+    files = {}
+    for word in sorted(found):
+        lines = files.setdefault("%s%s.TXT" % (WORD_PREFIX, word[0]), [])
+        line = word
+        separator = " "
+        for page_id in sorted(found[word]):
+            item = "%s%d" % (separator, page_id)
+            if len(line) + len(item) + 2 > WORD_LINE:
+                lines.append(line)
+                line, item = word, " %d" % page_id
+            line += item
+            separator = ","
+        lines.append(line)
+    return {name: crlf(lines) for name, lines in files.items()}
+
+
 def export_language(wiki, lang, prefix, public_url, ids, sitemap):
     """The files of one language folder: name -> bytes."""
     rendered = []
@@ -194,12 +245,14 @@ def export_language(wiki, lang, prefix, public_url, ids, sitemap):
     routes = {page["route"]: ids[page["route"]] for page, _ in rendered}
     files = {}
     index = []
+    searchable = []
     for page, parent, depth in tree_order([p for p, _ in rendered]):
         data = next(d for p, d in rendered if p is page)
         page_id = ids[page["route"]]
         lines, targets = render(data.get("html") or "", routes, lang, public_url)
         url = public_url.rstrip("/") + prefix + (page["route"] if page["route"] != "/" else "/")
         files["P%07d.TXT" % page_id] = page_file(page, data, lines, targets, url)
+        searchable.append((page_id, single_line(data.get("title") or page.get("title")), lines))
         index.append("\t".join([
             str(page_id), str(ids[parent]) if parent else "0", str(depth),
             str(int(data.get("modified") or page.get("modified") or 0)),
@@ -207,6 +260,7 @@ def export_language(wiki, lang, prefix, public_url, ids, sitemap):
             single_line(data.get("title") or page.get("title")),
         ]))
     files["INDEX.TXT"] = crlf(index)
+    files.update(word_files(searchable))
     files["FILES.LST"] = files_list(files)
     return files
 
@@ -294,7 +348,8 @@ def run_once(wiki, export_dir, languages, public_url):
         return False
     generation = read_generation(export_dir) + 1
     publish(export_dir, trees, languages, generation)
-    counts = ", ".join("%s %d pages" % (lang, len(trees[lang]) - 2) for lang in languages)
+    counts = ", ".join("%s %d pages" % (lang, sum(1 for name in trees[lang] if name.startswith("P")))
+                       for lang in languages)
     log("published generation %d: %s" % (generation, counts))
     return True
 

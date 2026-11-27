@@ -5,13 +5,16 @@
 #include "../lib/core/str.h"
 #include "../model/config.h"
 #include "../model/page_index.h"
+#include "../model/word_query.h"
 #include "../service/reader_service.h"
+#include "../service/search_service.h"
 #include "../service/sync_service.h"
 #include "../view/cli_view.h"
 
-CliController::CliController( SyncService &sync, ReaderService &reader, PageIndex &index, CliView &view, Config &config,
-                              Error &error )
-  : sync_( sync ), reader_( reader ), index_( index ), view_( view ), config_( config ), error_( error ) {}
+CliController::CliController( SyncService &sync, ReaderService &reader, SearchService &search, PageIndex &index,
+                              CliView &view, Config &config, Error &error )
+  : sync_( sync ), reader_( reader ), search_( search ), index_( index ), view_( view ), config_( config ),
+    error_( error ) {}
 
 void CliController::useLanguage( const char *lang ) {
   if ( lang == NULL ) return;
@@ -64,5 +67,30 @@ int CliController::show( const char *route, const char *lang ) {
     view_.printPageLine( line );
   }
   reader_.close();
+  return 0;
+}
+
+int CliController::find( const char *text, const char *lang ) {
+  useLanguage( lang );
+  if ( !loadIndex() ) return fail();
+  WordQuery query;
+  query.parse( text, config_.codePage );
+  SearchService::Result result = search_.search( config_.lang, query );
+  if ( result == SearchService::NoWords ) error_.set( "Give words of 3 letters or more" );
+  else if ( result == SearchService::NoIndex ) error_.set( "This export cannot be searched: the server is older" );
+  if ( result != SearchService::Searched ) return fail();
+  int found = 0;
+  for ( int i = 0; i < index_.count(); i++ ) {
+    if ( search_.found( index_.at( i ).id ) ) found++;
+  }
+  char msg[160];
+  snprintf( msg, sizeof( msg ), "%s: %d pages have every word", config_.lang, found );
+  view_.printMessage( msg );
+  for ( int i = 0; i < index_.count(); i++ ) {
+    const PageEntry &page = index_.at( i );
+    if ( !search_.found( page.id ) ) continue;
+    snprintf( msg, sizeof( msg ), "%-30s %s", page.route, page.title );
+    view_.printMessage( msg );
+  }
   return 0;
 }

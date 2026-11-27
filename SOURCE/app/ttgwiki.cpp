@@ -14,10 +14,12 @@
 #include "../model/config.h"
 #include "../model/manifest.h"
 #include "../model/page_index.h"
+#include "../repository/fs/fs_line_file.h"
 #include "../repository/fs/fs_page_source.h"
 #include "../repository/fs/fs_page_store.h"
 #include "../repository/ftp/ftp_remote_wiki.h"
 #include "../service/reader_service.h"
+#include "../service/search_service.h"
 #include "../service/sync_service.h"
 #include "../view/cli_view.h"
 #include "../view/wiki_view.h"
@@ -92,12 +94,15 @@ struct Ttgwiki {
   FsPageSource source;
   SyncService sync;
   ReaderService reader;
+  FsLineFile wordFile;
+  SearchService search;
 };
 
 Ttgwiki::Ttgwiki( Machine &m, Buffers &b, Progress &progress )
   : index( b.indexText ), remote( m.network, m.clock, config, progress, error ), store( m.fs, error ),
     source( m.fs, store, error, b.offsets, b.linkBits, MaxLines ),
-    sync( remote, store, index, syncBuffers( b ), config, progress, error ), reader( sync, source, config ) {}
+    sync( remote, store, index, syncBuffers( b ), config, progress, error ), reader( sync, source, config ),
+    wordFile( m.fs, store, error ), search( sync, wordFile, progress ) {}
 
 static bool loadConfig( Machine &m, Ttgwiki &app ) {
   char path[160], text[2048];
@@ -115,11 +120,12 @@ static bool loadConfig( Machine &m, Ttgwiki &app ) {
 }
 
 static void runBrowser( Machine &m, Ttgwiki &app, ProgressRelay &relay ) {
+  if ( app.config.rows ) m.screen.setRows( app.config.rows );
   Canvas canvas( m.screen );
   WikiView view( canvas, Version );
   NetworkIdle idle( m.network );
-  BrowserController *browser =
-      new BrowserController( app.sync, app.reader, app.index, view, m.keyboard, idle, app.config, app.error );
+  BrowserController *browser = new BrowserController( app.sync, app.reader, app.search, app.index, view, m.keyboard,
+                                                      idle, app.config, app.error );
   if ( browser == NULL ) return;
   relay.target = &view;
   browser->run();
@@ -131,15 +137,34 @@ static bool isHelp( const char *arg ) {
   return strcmp( arg, "/?" ) == 0 || cmpi( arg, "-h" ) == 0;
 }
 
+/* The arguments with a space between them, cut to size. */
+static void joinArgs( char *out, int size, char *args[], int count ) {
+  int len = 0;
+  out[0] = 0;
+  for ( int i = 0; i < count && len < size - 1; i++ ) {
+    if ( len ) out[len++] = ' ';
+    copyStr( out + len, args[i], size - len );
+    len = strlen( out );
+  }
+}
+
 static int runCommand( Machine &m, Ttgwiki &app, ProgressRelay &relay, int argc, char *argv[] ) {
   CliView cliView( m.out );
-  CliController cli( app.sync, app.reader, app.index, cliView, app.config, app.error );
+  CliController cli( app.sync, app.reader, app.search, app.index, cliView, app.config, app.error );
   if ( cmpi( argv[1], "SYNC" ) == 0 && argc <= 3 ) {
     relay.target = &cliView;
     return cli.sync( argc == 3 ? argv[2] : NULL );
   }
   if ( cmpi( argv[1], "SHOW" ) == 0 && ( argc == 3 || argc == 4 ) )
     return cli.show( argv[2], argc == 4 ? argv[3] : NULL );
+  if ( cmpi( argv[1], "FIND" ) == 0 && argc >= 3 ) {
+    relay.target = &cliView;
+    const char *lang = NULL;
+    if ( argc > 3 && strlen( argv[argc - 1] ) == 2 ) lang = argv[--argc];
+    char text[BrowserController::QuerySize * 2];
+    joinArgs( text, sizeof( text ), argv + 2, argc - 2 );
+    return cli.find( text, lang );
+  }
   cliView.printUsage( Version );
   return 1;
 }

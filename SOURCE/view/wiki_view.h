@@ -9,6 +9,7 @@
 #define TTGWIKI_VIEW_WIKI_VIEW_H
 
 #include "../lib/core/progress.h"
+#include "../lib/platform/screen.h"
 
 class Canvas;
 class Error;
@@ -21,7 +22,9 @@ struct TreeState {
   const int *visible; /* indexes into the index */
   int count;
   const ListCursor *cursor;
-  const char *query; /* the search text, "" for none */
+  const char *query; /* the title search, "" for none */
+  const char *text;  /* the text search */
+  int textMode;      /* NoText, TypingText or TextFound */
   const char *lang;
   unsigned long generation;
 };
@@ -40,13 +43,19 @@ struct ReaderState {
   const char *lang;
 };
 
+enum TextMode { NoText, TypingText, TextFound };
+
 class WikiView : public Progress {
 public:
-  enum { ListTop = 2, ListRows = 20, TextTop = 1, TextRows = 22, TextColumn = 1 };
+  enum { ListTop = 2, TextTop = 1, TextColumn = 1, MaxTextRows = Screen::MaxRows - 3 };
 
   WikiView( Canvas &canvas, const char *version );
+  /* Takes the screen over: the rows of the lists are known from here on. */
   void open();
   void close();
+  /* The rows of the contents' list and of the page text (20 and 22 on 25 rows). */
+  int listRows() const;
+  int textRows() const;
   void drawTree( const TreeState &state );
   void drawPage( const ReaderState &state );
   void report( const char *text );
@@ -59,6 +68,9 @@ private:
   void drawTreeRow( int row, const TreeState &state, int item );
   void drawPageLine( int row, const char *line, const ReaderState &state, int lineNumber );
   void status( const char *text, unsigned char attr );
+  int infoRow() const;
+  int statusRow() const;
+  int keysRow() const;
 
   Canvas &canvas_;
   const char *version_;

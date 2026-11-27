@@ -9,6 +9,7 @@
 #include "../../model/page_line.h"
 #include "../../model/text_match.h"
 #include "../../model/wiki_info.h"
+#include "../../model/word_query.h"
 
 TEST( configReadsTheSettings ) {
   Config config;
@@ -22,6 +23,17 @@ TEST( configReadsTheSettings ) {
   CHECK( config.codePage == CodePage852 );
   CHECK_STR( config.cache, "D:\\WIKI" );
   CHECK( !config.read( "CODEPAGE=850\r\n" ) );
+}
+
+TEST( configReadsTheRows ) {
+  Config config;
+  CHECK_INT( config.rows, 0 );
+  CHECK( config.read( "ROWS=50\r\n" ) );
+  CHECK_INT( config.rows, 50 );
+  CHECK( config.read( "ROWS=43\r\n" ) );
+  CHECK_INT( config.rows, 50 );
+  CHECK( config.read( "ROWS=25\r\n" ) );
+  CHECK_INT( config.rows, 25 );
 }
 
 TEST( wikiInfoReadsTheLanguages ) {
@@ -135,4 +147,37 @@ TEST( historyForgetsTheOldest ) {
   while ( history.pop( visit ) ) {
   }
   CHECK_INT( visit.id, 3 );
+}
+
+TEST( wordQueryFoldsTheWords ) {
+  WordQuery query;
+  CHECK_INT( query.parse( "go DOS-tools, \x94sz j\xA0t\x82k", CodePage437 ), 4 );
+  CHECK_STR( query.word( 0 ), "DOS" );
+  CHECK_STR( query.word( 1 ), "TOOLS" );
+  CHECK_STR( query.word( 2 ), "OSZ" );
+  CHECK_STR( query.word( 3 ), "JATEK" );
+  CHECK_INT( query.parse( "\xB5rv\xA1zt\xFBr\x8B", CodePage852 ), 1 );
+  CHECK_STR( query.word( 0 ), "ARVIZTURO" );
+  CHECK_INT( query.parse( "a b", CodePage437 ), 0 );
+  char name[13];
+  wordFileName( "GMENU", name );
+  CHECK_STR( name, "WORDS_G.TXT" );
+  CHECK( isWordFile( "WORDS_7.TXT" ) );
+  CHECK( !isWordFile( "P0000001.TXT" ) );
+}
+
+TEST( wordLinesMatchTheStartOfTheirWord ) {
+  CHECK_STR( wordLineIds( "DOSBOX 2,40", "DOS" ), "2,40" );
+  CHECK_STR( wordLineIds( "DOS 1", "DOS" ), "1" );
+  CHECK( wordLineIds( "DO 1", "DOS" ) == NULL );
+  CHECK( wordLineIds( "DIR 1", "DOS" ) == NULL );
+  const char *pos = "3,12,40";
+  unsigned id = 0, sum = 0;
+  int n = 0;
+  while ( nextWordId( pos, id ) ) {
+    sum += id;
+    n++;
+  }
+  CHECK_INT( n, 3 );
+  CHECK_INT( sum, 55 );
 }

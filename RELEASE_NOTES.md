@@ -4,7 +4,13 @@ TTGWIKI – the Teletype Games wiki on DOS: browse, search and print its public 
 
 **Install on Windows 95 and later:** install `TTGWIKIW` with DOSINST, or unzip `TTGWIKIW-<version>.zip` (for example to `C:\TTGWIKIW`) and start `TTGWIKIW.EXE`; it uses Windows' own TCP/IP.
 
-**New in 0.2.1:**
+**New in 0.3.0:**
+
+- Text search: F3 in the contents (or `TTGWIKI FIND words [lang]`) lists the pages that have every word typed, also as the start of a longer word, ignoring case and accents. It downloads only the word files it needs and keeps them, so it works offline too (after F6 for every word)
+- A tall screen: `ROWS=50` in `TTGWIKI.CFG` gives 80x50 on a VGA (80x43 on an EGA), and a console of 50 rows on Windows; without it TTGWIKI keeps the rows the screen has, and gives them back when it quits
+- The exporter writes the word files (`WORDS_A.TXT` ...) next to the pages; older TTGWIKIs read the new export as before
+
+**0.2.1:**
 
 - The release has its source documentation in the catalog (Doxygen, opened with Open on the catalog page); the program itself did not change
 

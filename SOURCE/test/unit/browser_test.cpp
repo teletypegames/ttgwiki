@@ -12,9 +12,11 @@
 #include "../../lib/ui/canvas.h"
 #include "../../model/config.h"
 #include "../../model/manifest.h"
+#include "../../repository/fs/fs_line_file.h"
 #include "../../repository/fs/fs_page_source.h"
 #include "../../repository/fs/fs_page_store.h"
 #include "../../service/reader_service.h"
+#include "../../service/search_service.h"
 #include "../../service/sync_service.h"
 #include "../../view/cli_view.h"
 
@@ -51,7 +53,8 @@ struct Browser : TestBuffers {
   Browser()
     : index( indexText ), store( fs, error ), source( fs, store, error, offsets, bits, 200 ),
       sync( remote, store, index, buffers(), config, progress, error ), reader( sync, source, config ),
-      canvas( screen ), view( canvas, "0.0.0" ), kept( screen ) {
+      wordFile( fs, store, error ), search( sync, wordFile, progress ), canvas( screen ), view( canvas, "0.0.0" ),
+      kept( screen ) {
     store.setRoot( "C:\\CACHE" );
     remote.putInfo( 1 );
     remote.putIndex( "EN", Index );
@@ -64,6 +67,8 @@ struct Browser : TestBuffers {
                     "DOS programs: \x02"
                     "1\x03GMENU\x04\r\n" );
     remote.putPage( "EN", 3, "GMENU", "", "A game menu\r\n\x07 one\r\n" );
+    remote.put( "EN/WORDS_G.TXT", "GAME 3\r\nGMENU 2,3\r\n" );
+    remote.put( "EN/WORDS_T.TXT", "THE 1\r\nTOOLS 1\r\n" );
     remote.putManifest( "EN" );
     remote.putIndex( "HU", "1\t0\t0\t100\thu\t/\tKezd\xC5\x91lap\r\n" );
     remote.putPage( "HU", 1, "Kezd\xC5\x91lap", "",
@@ -79,7 +84,8 @@ struct Browser : TestBuffers {
 
   KeepScreen &run( const char *keys ) {
     ScriptedKeyboard keyboard( keys, kept );
-    BrowserController *browser = new BrowserController( sync, reader, index, view, keyboard, idle, config, error );
+    BrowserController *browser =
+        new BrowserController( sync, reader, search, index, view, keyboard, idle, config, error );
     browser->run();
     delete browser;
     return kept;
@@ -96,6 +102,8 @@ struct Browser : TestBuffers {
   FsPageSource source;
   SyncService sync;
   ReaderService reader;
+  FsLineFile wordFile;
+  SearchService search;
   MemoryScreen screen;
   Canvas canvas;
   WikiView view;
@@ -160,6 +168,19 @@ TEST( f2ShowsThePageInTheOtherLanguage ) {
   CHECK_STR( b.config.lang, "HU" );
 }
 
+TEST( aTallScreenShowsMoreRows ) {
+  static Browser b;
+  b.screen.setRows( Screen::TallRows );
+  KeepScreen &s = b.run( "1C0D" );
+  CHECK( strncmp( s.row( 0 ), " Home ", 6 ) == 0 );
+  CHECK( strncmp( s.row( 49 ), " Tab Next link", 14 ) == 0 );
+  static Browser c;
+  c.screen.setRows( Screen::TallRows );
+  KeepScreen &t = c.run( "" );
+  CHECK_STR( t.row( 48 ), " 3 pages, export #1 (new)" );
+  CHECK( strncmp( t.row( 49 ), " Enter Read", 11 ) == 0 );
+}
+
 TEST( offlineTheBrowserShowsTheError ) {
   static Browser b;
   b.remote.online = false;
@@ -172,7 +193,7 @@ TEST( cliShowPrintsThePage ) {
   static Browser b;
   CapturedOutput out;
   CliView view( out );
-  CliController cli( b.sync, b.reader, b.index, view, b.config, b.error );
+  CliController cli( b.sync, b.reader, b.search, b.index, view, b.config, b.error );
   CHECK_INT( cli.show( "/", NULL ), 0 );
   CHECK_STR( out.text, "Welcome\n\nSee the DOS tools and the web.\n" );
   out.text[0] = 0;
@@ -184,4 +205,33 @@ TEST( cliShowPrintsThePage ) {
   out.text[0] = 0;
   CHECK_INT( cli.sync( "en" ), 0 );
   CHECK_STR( out.text, "EN: export #1, 3 pages, 1 downloaded\n" );
+}
+
+TEST( f3SearchesTheText ) {
+  static Browser b;
+  KeepScreen &s = b.run( "3D00 2267 226D 1C0D 1265 1C0D" );
+  CHECK( strncmp( s.row( 2 ), " DOS ", 5 ) == 0 );
+  CHECK( strncmp( s.row( 3 ), " GMENU ", 7 ) == 0 );
+  CHECK_STR( s.row( 4 ), "" );
+  CHECK( strncmp( s.row( 22 ), " Text: gme ", 11 ) == 0 );
+  CHECK_STR( s.row( 23 ), " 2 pages have every word" );
+  static Browser c;
+  KeepScreen &t = c.run( "3D00 2267 2261 226D 1C0D 1C0D" );
+  CHECK( strncmp( t.row( 0 ), " GMENU ", 7 ) == 0 );
+  static Browser d;
+  KeepScreen &u = d.run( "3D00 2267 226D 1265 1C0D 011B" );
+  CHECK( strncmp( u.row( 2 ), " Home ", 6 ) == 0 );
+  CHECK( strncmp( u.row( 22 ), " /", 2 ) == 0 );
+}
+
+TEST( cliFindListsThePages ) {
+  static Browser b;
+  CapturedOutput out;
+  CliView view( out );
+  CliController cli( b.sync, b.reader, b.search, b.index, view, b.config, b.error );
+  CHECK_INT( cli.find( "game gme", NULL ), 0 );
+  CHECK_STR( out.text, "EN: 1 pages have every word\n/dos/gmenu                     GMENU\n" );
+  out.text[0] = 0;
+  CHECK_INT( cli.find( "x", NULL ), 1 );
+  CHECK_STR( out.text, "Error: Give words of 3 letters or more\n" );
 }

@@ -11,19 +11,21 @@
 #include "../model/config.h"
 #include "../model/page_line.h"
 #include "../model/text_match.h"
+#include "../model/word_query.h"
 #include "../service/reader_service.h"
+#include "../service/search_service.h"
 #include "../service/sync_service.h"
 
 enum { ShiftTabCode = 0x0F00 };
 
-BrowserController::BrowserController( SyncService &sync, ReaderService &reader, PageIndex &index, WikiView &view,
-                                      Keyboard &keyboard, Idle &idle, Config &config, Error &error )
-  : sync_( sync ), reader_( reader ), index_( index ), view_( view ), keyboard_( keyboard ), idle_( idle ),
-    config_( config ), error_( error ), mode_( Contents ), visibleCount_( 0 ), top_( 0 ) {
-  query_[0] = 0;
-  cursor_.setRows( WikiView::ListRows );
+BrowserController::BrowserController( SyncService &sync, ReaderService &reader, SearchService &search, PageIndex &index,
+                                      WikiView &view, Keyboard &keyboard, Idle &idle, Config &config, Error &error )
+  : sync_( sync ), reader_( reader ), search_( search ), index_( index ), view_( view ), keyboard_( keyboard ),
+    idle_( idle ), config_( config ), error_( error ), mode_( Contents ), visibleCount_( 0 ), textMode_( NoText ),
+    textFound_( false ), top_( 0 ), textRows_( 0 ) {
+  query_[0] = text_[0] = 0;
   clearSelection();
-  for ( int i = 0; i < WikiView::TextRows; i++ ) linePointers_[i] = lines_[i];
+  for ( int i = 0; i < WikiView::MaxTextRows; i++ ) linePointers_[i] = lines_[i];
 }
 
 unsigned BrowserController::waitKey() {
@@ -34,6 +36,8 @@ unsigned BrowserController::waitKey() {
 void BrowserController::run() {
   keyboard_.begin();
   view_.open();
+  cursor_.setRows( view_.listRows() );
+  textRows_ = view_.textRows();
   sync_.loadLocal( config_.lang );
   rebuildVisible( 0 );
   drawContents();
@@ -55,6 +59,7 @@ void BrowserController::rebuildVisible( unsigned keepId ) {
   int keep = 0;
   for ( int i = 0; i < index_.count(); i++ ) {
     const PageEntry &page = index_.at( i );
+    if ( textFound_ && !search_.found( page.id ) ) continue;
     if ( query_[0] && !containsFolded( page.title, query_, config_.codePage ) &&
          !containsFolded( page.route, query_, config_.codePage ) ) {
       continue;
@@ -72,7 +77,8 @@ unsigned BrowserController::selectedId() const {
 }
 
 void BrowserController::drawContents() {
-  TreeState state = { &index_, visible_, visibleCount_, &cursor_, query_, config_.lang, sync_.info().generation };
+  TreeState state = { &index_,   visible_,     visibleCount_,          &cursor_, query_, text_,
+                      textMode_, config_.lang, sync_.info().generation };
   view_.drawTree( state );
 }
 
@@ -100,12 +106,19 @@ void BrowserController::refresh() {
 bool BrowserController::contentsKey( unsigned key ) {
   unsigned char ch = keyAscii( key ), scan = keyScan( key );
   if ( isExtendedKey( key ) ) {
-    if ( scan == ScanF2 ) switchLanguage();
+    if ( scan == ScanF3 ) {
+      textMode_ = TypingText;
+      query_[0] = 0;
+      rebuildVisible( selectedId() );
+      drawContents();
+    }
+    else if ( scan == ScanF2 ) switchLanguage();
     else if ( scan == ScanF5 ) refresh();
     else if ( scan == ScanF6 ) downloadAll();
     else moveSelection( scan );
     return true;
   }
+  if ( textMode_ != NoText && textKey( ch ) ) return true;
   if ( ch == KeyEsc ) {
     if ( query_[0] == 0 ) return false;
     unsigned keep = selectedId();
@@ -127,7 +140,7 @@ bool BrowserController::contentsKey( unsigned key ) {
 
 void BrowserController::moveSelection( unsigned char scan ) {
   int sel = cursor_.sel();
-  int page = WikiView::ListRows - 1;
+  int page = cursor_.rows() - 1;
   if ( scan == ScanUp ) sel--;
   else if ( scan == ScanDown ) sel++;
   else if ( scan == ScanPgUp ) sel -= page;
@@ -158,6 +171,71 @@ void BrowserController::typeQuery( unsigned char ch ) {
   drawContents();
 }
 
+/* The keys of the text search; false for the ones it leaves to the contents. */
+bool BrowserController::textKey( unsigned char ch ) {
+  if ( ch == KeyEsc ) {
+    leaveText();
+    return true;
+  }
+  if ( ch == KeyEnter ) {
+    if ( textMode_ == TextFound ) return false;
+    searchText();
+    return true;
+  }
+  int len = strlen( text_ );
+  if ( ch == KeyBackspace ) {
+    if ( len ) text_[len - 1] = 0;
+  }
+  else if ( ch >= ' ' && len < QuerySize - 1 ) {
+    text_[len] = (char)ch;
+    text_[len + 1] = 0;
+  }
+  else return true;
+  textMode_ = TypingText;
+  drawContents();
+  return true;
+}
+
+void BrowserController::searchText() {
+  WordQuery query;
+  query.parse( text_, config_.codePage );
+  view_.report( "Searching the text..." );
+  SearchService::Result result = search_.search( config_.lang, query );
+  if ( result == SearchService::NoWords ) {
+    view_.showMessage( "Type words of 3 letters or more" );
+    return;
+  }
+  if ( result == SearchService::NoIndex ) {
+    view_.showMessage( "This export cannot be searched: the server is older" );
+    return;
+  }
+  if ( result == SearchService::Failed ) {
+    view_.showError( error_ );
+    error_.clear();
+    return;
+  }
+  textMode_ = TextFound;
+  textFound_ = true;
+  rebuildVisible( 0 );
+  cursor_.place( 0, 0 );
+  drawContents();
+  char msg[80];
+  if ( visibleCount_ == 0 ) snprintf( msg, sizeof( msg ), "No page has every word" );
+  else snprintf( msg, sizeof( msg ), "%d pages have every word", visibleCount_ );
+  view_.showMessage( msg );
+}
+
+void BrowserController::leaveText() {
+  unsigned keep = selectedId();
+  textMode_ = NoText;
+  textFound_ = false;
+  search_.clear();
+  rebuildVisible( keep );
+  cursor_.scrollToSelection();
+  drawContents();
+  view_.clearStatus();
+}
+
 void BrowserController::switchLanguage() {
   const WikiInfo &info = sync_.info();
   char next[4];
@@ -168,6 +246,9 @@ void BrowserController::switchLanguage() {
     return;
   }
   unsigned keep = mode_ == Reading ? reader_.id() : selectedId();
+  textMode_ = NoText;
+  textFound_ = false;
+  search_.clear();
   copyStr( config_.lang, next, sizeof( config_.lang ) );
   sync_.loadLocal( config_.lang );
   view_.report( "Changing the language..." );
@@ -244,7 +325,7 @@ void BrowserController::showPageMessage() {
 
 void BrowserController::drawPage() {
   int shown = 0;
-  for ( int row = 0; row < WikiView::TextRows && top_ + row < reader_.lineCount(); row++ ) {
+  for ( int row = 0; row < textRows_ && top_ + row < reader_.lineCount(); row++ ) {
     if ( !reader_.readLine( top_ + row, lines_[row], LineSize ) ) break;
     shown++;
   }
@@ -254,7 +335,7 @@ void BrowserController::drawPage() {
 }
 
 void BrowserController::clampTop() {
-  int max = reader_.lineCount() - WikiView::TextRows;
+  int max = reader_.lineCount() - textRows_;
   if ( top_ > max ) top_ = max;
   if ( top_ < 0 ) top_ = 0;
 }
@@ -276,7 +357,7 @@ bool BrowserController::readerKey( unsigned key ) {
 }
 
 void BrowserController::scroll( unsigned char scan ) {
-  int page = WikiView::TextRows - 1;
+  int page = textRows_ - 1;
   int top = top_;
   if ( scan == ScanUp ) top_--;
   else if ( scan == ScanDown ) top_++;
@@ -287,7 +368,7 @@ void BrowserController::scroll( unsigned char scan ) {
   else return;
   clampTop();
   if ( top_ == top ) return;
-  if ( selLine_ >= 0 && ( selLine_ < top_ || selLine_ >= top_ + WikiView::TextRows ) ) {
+  if ( selLine_ >= 0 && ( selLine_ < top_ || selLine_ >= top_ + textRows_ ) ) {
     clearSelection();
     view_.clearStatus();
   }
@@ -295,8 +376,8 @@ void BrowserController::scroll( unsigned char scan ) {
 }
 
 void BrowserController::showLine( int line ) {
-  if ( line >= top_ && line < top_ + WikiView::TextRows ) return;
-  top_ = line - WikiView::TextRows / 2;
+  if ( line >= top_ && line < top_ + textRows_ ) return;
+  top_ = line - textRows_ / 2;
   clampTop();
 }
 
@@ -336,7 +417,7 @@ void BrowserController::previousLink() {
   LinkSpot spot;
   int lines = reader_.lineCount();
   if ( lines == 0 ) return;
-  int start = selLine_ >= 0 ? selLine_ : top_ + WikiView::TextRows - 1;
+  int start = selLine_ >= 0 ? selLine_ : top_ + textRows_ - 1;
   if ( start >= lines ) start = lines - 1;
   int column = selLine_ >= 0 ? selColumn_ : LineSize;
   for ( int pass = 0; pass < 2; pass++ ) {

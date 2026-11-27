@@ -15,7 +15,8 @@ void CliView::printUsage( const char *version ) {
   printTo( out_, "TTGWIKI %s - the Teletype Games wiki, read on DOS\n\n", version );
   printTo( out_, "TTGWIKI                   browse the wiki\n" );
   printTo( out_, "TTGWIKI SYNC [lang]       download every page, to read them offline\n" );
-  printTo( out_, "TTGWIKI SHOW route [lang] print a page (TTGWIKI SHOW /dos/gmenu > PRN)\n\n" );
+  printTo( out_, "TTGWIKI SHOW route [lang] print a page (TTGWIKI SHOW /dos/gmenu > PRN)\n" );
+  printTo( out_, "TTGWIKI FIND words [lang] list the pages that have every word\n\n" );
   printTo( out_, "The settings are in TTGWIKI.CFG next to TTGWIKI.EXE.\n" );
 }
 

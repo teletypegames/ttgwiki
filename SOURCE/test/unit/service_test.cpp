@@ -7,9 +7,12 @@
 #include "../../model/config.h"
 #include "../../model/manifest.h"
 #include "../../model/page_index.h"
+#include "../../model/word_query.h"
+#include "../../repository/fs/fs_line_file.h"
 #include "../../repository/fs/fs_page_source.h"
 #include "../../repository/fs/fs_page_store.h"
 #include "../../service/reader_service.h"
+#include "../../service/search_service.h"
 #include "../../service/sync_service.h"
 
 static const char Index[] = "1\t0\t0\t100\ten\t/\tHome\r\n2\t1\t1\t100\ten\t/dos\tDOS\r\n";
@@ -30,7 +33,8 @@ struct TestBuffers {
 struct World : TestBuffers {
   World()
     : index( indexText ), store( fs, error ), source( fs, store, error, offsets, bits, 200 ),
-      sync( remote, store, index, buffers(), config, progress, error ), reader( sync, source, config ) {
+      sync( remote, store, index, buffers(), config, progress, error ), reader( sync, source, config ),
+      wordFile( fs, store, error ), search( sync, wordFile, progress ) {
     store.setRoot( "C:\\TTGWIKI\\CACHE" );
     remote.putInfo( 1 );
     remote.putIndex( "EN", Index );
@@ -40,6 +44,21 @@ struct World : TestBuffers {
                     "DOS\x04\r\n" );
     remote.putPage( "EN", 2, "DOS", "", "DOS programs\r\n" );
     remote.putManifest( "EN" );
+  }
+
+  /* Word files besides the pages. */
+  void putWords() {
+    remote.put( "EN/WORDS_D.TXT", "DOS 1,2\r\nDOSBOX 2\r\n" );
+    remote.put( "EN/WORDS_H.TXT", "HOME 1\r\n" );
+    remote.put( "EN/WORDS_P.TXT", "PROGRAMS 2\r\n" );
+    remote.put( "EN/WORDS_W.TXT", "WELCOME 1\r\n" );
+    remote.putManifest( "EN" );
+  }
+
+  SearchService::Result find( const char *text ) {
+    WordQuery query;
+    query.parse( text, CodePage437 );
+    return search.search( "EN", query );
   }
 
   SyncBuffers buffers() {
@@ -64,6 +83,8 @@ struct World : TestBuffers {
   FsPageSource source;
   SyncService sync;
   ReaderService reader;
+  FsLineFile wordFile;
+  SearchService search;
 };
 
 TEST( firstRefreshBringsTheIndex ) {
@@ -163,4 +184,47 @@ TEST( aMissingLanguageIsAnError ) {
   static World w;
   CHECK( w.sync.refresh( "DE" ) == SyncService::Failed );
   CHECK_STR( w.error.text(), "The wiki has no DE pages" );
+}
+
+TEST( searchFindsThePagesWithEveryWord ) {
+  static World w;
+  w.putWords();
+  w.sync.refresh( "EN" );
+  CHECK( w.find( "dos" ) == SearchService::Searched );
+  CHECK( w.search.found( 1 ) && w.search.found( 2 ) );
+  CHECK_INT( w.search.foundCount(), 2 );
+  CHECK( w.find( "DOS programs" ) == SearchService::Searched );
+  CHECK( !w.search.found( 1 ) && w.search.found( 2 ) );
+  CHECK( w.cached( "WORDS_D.TXT" ) && w.cached( "WORDS_P.TXT" ) && !w.cached( "WORDS_H.TXT" ) );
+  CHECK( w.find( "dosb" ) == SearchService::Searched );
+  CHECK( !w.search.found( 1 ) && w.search.found( 2 ) );
+  CHECK( w.find( "welcome zebra" ) == SearchService::Searched );
+  CHECK_INT( w.search.foundCount(), 0 );
+  CHECK( w.find( "go" ) == SearchService::NoWords );
+}
+
+TEST( searchKeepsTheWordFiles ) {
+  static World w;
+  w.putWords();
+  w.sync.refresh( "EN" );
+  w.find( "home" );
+  int downloads = w.remote.downloads;
+  w.remote.online = false;
+  CHECK( w.find( "home" ) == SearchService::Searched );
+  CHECK( w.search.found( 1 ) );
+  CHECK_INT( w.remote.downloads, downloads );
+}
+
+TEST( anExportWithoutWordFilesCannotBeSearched ) {
+  static World w;
+  w.sync.refresh( "EN" );
+  CHECK( w.find( "dos" ) == SearchService::NoIndex );
+}
+
+TEST( downloadAllAlsoBringsTheWordFiles ) {
+  static World w;
+  w.putWords();
+  w.sync.refresh( "EN" );
+  CHECK_INT( w.sync.downloadAll( "EN" ), 2 );
+  CHECK( w.cached( "WORDS_W.TXT" ) );
 }

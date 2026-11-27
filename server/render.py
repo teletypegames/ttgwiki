@@ -608,5 +608,5 @@ def render(html, routes, lang, base_url, width=WIDTH):
 
 
 def visible(line):
-    """A line without its control bytes (for the tests)."""
+    """A line without its control bytes: the text a reader sees."""
     return re.sub("\x01.|\x02[0-9]*\x03|\x04", "", line)

@@ -5,7 +5,7 @@
 #include "../lib/core/ini.h"
 #include "../lib/core/str.h"
 
-Config::Config() : port( 21 ), codePage( CodePage437 ) {
+Config::Config() : port( 21 ), codePage( CodePage437 ), rows( 0 ) {
   strcpy( server, "ftp.teletypegames.org" );
   strcpy( user, "anonymous" );
   strcpy( password, "ttgwiki@" );
@@ -20,6 +20,11 @@ static unsigned numberOf( const IniLine &line ) {
   return (unsigned)atoi( value );
 }
 
+static int rowsOf( unsigned n ) {
+  if ( n == 0 ) return 0;
+  return n > 25 ? 50 : 25;
+}
+
 bool Config::read( const char *ini ) {
   IniScanner scanner( ini );
   IniLine line;
@@ -32,6 +37,7 @@ bool Config::read( const char *ini ) {
     else if ( line.keyIs( "PATH" ) ) line.copyValue( root, sizeof( root ) );
     else if ( line.keyIs( "LANG" ) ) line.copyValue( lang, sizeof( lang ) );
     else if ( line.keyIs( "CACHE" ) ) line.copyValue( cache, sizeof( cache ) );
+    else if ( line.keyIs( "ROWS" ) ) rows = rowsOf( numberOf( line ) );
     else if ( line.keyIs( "CODEPAGE" ) ) ok = codePageOf( numberOf( line ), codePage ) && ok;
   }
   upcaseStr( lang );

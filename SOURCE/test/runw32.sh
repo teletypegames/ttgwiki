@@ -67,6 +67,12 @@ check '^EN: export #1, 3 pages, 0 downloaded$' "a second SYNC downloads nothing"
 cmp -s "$WORK/bin/CACHE/EN/P0000002.TXT" "$WORK/export/EN/P0000002.TXT" && ok "a page is byte exact" ||
   fail "a page is byte exact"
 
+echo "--- the text search"
+run_w32 "FIND game menu"
+cat "$WORK/out.txt"
+check '^EN: 1 pages have every word$' "FIND finds the page with every word"
+check '^/dos/gmenu +GMENU$' "FIND lists the route and the title"
+
 echo "--- a new export, Hungarian in code page 852"
 "$PYTHON" ../../server/test/fixture.py "$WORK/export" 2 > /dev/null
 printf 'SERVER=127.0.0.1\r\nPORT=%s\r\nLANG=EN\r\nCODEPAGE=852\r\n' "$PORT" > "$WORK/bin/TTGWIKI.CFG"
