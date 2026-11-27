@@ -1,19 +1,32 @@
 #include "console_screen.h"
 
 ConsoleScreen::ConsoleScreen()
-  : screen_( INVALID_HANDLE_VALUE ), oldScreen_( INVALID_HANDLE_VALUE ), dirtyFrom_( Cells ), dirtyTo_( 0 ) {
-  for ( int i = 0; i < Cells; i++ ) {
+  : screen_( INVALID_HANDLE_VALUE ), oldScreen_( INVALID_HANDLE_VALUE ), dirtyFrom_( MaxCells ), dirtyTo_( 0 ),
+    asked_( 0 ), rows_( Rows ) {
+  for ( int i = 0; i < MaxCells; i++ ) {
     cells_[i].Char.AsciiChar = ' ';
     cells_[i].Attributes = 0x07;
   }
+}
+
+void ConsoleScreen::setRows( int rows ) {
+  asked_ = rows;
+}
+
+int ConsoleScreen::rows() const {
+  return rows_;
 }
 
 void ConsoleScreen::begin() {
   oldScreen_ = GetStdHandle( STD_OUTPUT_HANDLE );
   screen_ = CreateConsoleScreenBuffer( GENERIC_READ | GENERIC_WRITE, 0, NULL, CONSOLE_TEXTMODE_BUFFER, NULL );
   if ( screen_ == INVALID_HANDLE_VALUE ) screen_ = oldScreen_;
-  COORD size = { Cols, Rows };
-  SMALL_RECT window = { 0, 0, Cols - 1, Rows - 1 };
+  rows_ = asked_ > Rows ? asked_ : Rows;
+  if ( rows_ > MaxRows ) rows_ = MaxRows;
+  COORD largest = GetLargestConsoleWindowSize( screen_ );
+  if ( rows_ > Rows && largest.Y < rows_ ) rows_ = largest.Y > Rows ? largest.Y : Rows;
+  COORD size = { Cols, (SHORT)rows_ };
+  SMALL_RECT window = { 0, 0, Cols - 1, (SHORT)( rows_ - 1 ) };
   SetConsoleScreenBufferSize( screen_, size );
   SetConsoleWindowInfo( screen_, TRUE, &window );
   SetConsoleActiveScreenBuffer( screen_ );
@@ -25,7 +38,7 @@ void ConsoleScreen::end() {
 }
 
 void ConsoleScreen::put( int pos, char c, unsigned char attr ) {
-  if ( pos < 0 || pos >= Cells ) return;
+  if ( pos < 0 || pos >= rows_ * Cols ) return;
   cells_[pos].Char.AsciiChar = c;
   cells_[pos].Attributes = attr;
   if ( pos < dirtyFrom_ ) dirtyFrom_ = pos;
@@ -38,11 +51,11 @@ unsigned ConsoleScreen::cell( int pos ) const {
 
 void ConsoleScreen::flush() {
   if ( dirtyFrom_ >= dirtyTo_ ) return;
-  COORD size = { Cols, Rows };
+  COORD size = { Cols, (SHORT)rows_ };
   COORD from = { 0, (SHORT)( dirtyFrom_ / Cols ) };
   SMALL_RECT rect = { 0, (SHORT)( dirtyFrom_ / Cols ), Cols - 1, (SHORT)( ( dirtyTo_ - 1 ) / Cols ) };
   WriteConsoleOutputA( screen_, cells_, size, from, &rect );
-  dirtyFrom_ = Cells;
+  dirtyFrom_ = MaxCells;
   dirtyTo_ = 0;
 }
 

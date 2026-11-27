@@ -7,7 +7,7 @@ bool dumpScreen( Screen &screen, FileSystem &fs, const char *path ) {
   int h = fs.create( path );
   if ( h < 0 ) return false;
   bool ok = true;
-  for ( int y = 0; y < Screen::Rows; y++ ) {
+  for ( int y = 0; y < screen.rows(); y++ ) {
     for ( int x = 0; x < Screen::Cols; x++ ) {
       unsigned cell = screen.cell( y * Screen::Cols + x );
       row[2 * x] = (unsigned char)cell;

@@ -4,6 +4,7 @@
 #include "../testing/host/memory_screen.h"
 #include "../testing/host/minitest.h"
 #include "../testing/scripted_keyboard.h"
+#include "../testing/screen_dump.h"
 #include "../ui/canvas.h"
 #include "../ui/list_cursor.h"
 
@@ -74,6 +75,28 @@ TEST( canvasFooterTogglesTheHighlight ) {
   CHECK_STR( screen.text( 0 ), "F1 Help" );
   CHECK_INT( screen.attr( 0, 0 ), 0x74 );
   CHECK_INT( screen.attr( 0, 3 ), 0x70 );
+}
+
+TEST( aTallScreenHasItsRowsAfterBegin ) {
+  MemoryScreen screen;
+  Canvas canvas( screen );
+  CHECK_INT( canvas.rows(), 25 );
+  screen.setRows( Screen::TallRows );
+  screen.begin();
+  CHECK_INT( canvas.rows(), 50 );
+  canvas.textAt( 49, 0, "last", 4, 0x07 );
+  CHECK_STR( screen.text( 49 ), "last" );
+}
+
+TEST( theScreenDumpHasEveryRow ) {
+  MemoryScreen screen;
+  FakeFileSystem fs;
+  CHECK( dumpScreen( screen, fs, "C:\\SCREEN.BIN" ) );
+  CHECK_INT( (int)fs.size( "C:\\SCREEN.BIN" ), 80 * 25 * 2 );
+  screen.setRows( Screen::TallRows );
+  screen.begin();
+  CHECK( dumpScreen( screen, fs, "C:\\SCREEN.BIN" ) );
+  CHECK_INT( (int)fs.size( "C:\\SCREEN.BIN" ), 80 * 50 * 2 );
 }
 
 TEST( listCursorKeepsTheSelectionInView ) {
